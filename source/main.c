@@ -125,6 +125,8 @@
 #include "nrf_sdh_soc.h"
 #include "app_timer.h"
 #include "peer_manager.h"
+   
+#include "sysparams.h"
 
 #define MODIFICATION_TYPE_BUTTON 0 /* predefined value, MUST REMAIN UNCHANGED */
 #define MODIFICATION_TYPE_AUTO   1 /* predefined value, MUST REMAIN UNCHANGED */
@@ -168,6 +170,9 @@ static uint16_t timeout_secs = 0;
 app_gpiote_user_id_t m_app_gpiote_my_id;
 app_gpiote_user_id_t  id_ad7124;
 app_gpiote_user_id_t  id_adxl335;
+int32_t adc_buffer[2];
+uint8_t bmi_buffer[12];
+
 
 //BLE_NUS_DEF(m_nus);                                                                 /**< BLE NUS service instance. */
 NRF_BLE_GATT_DEF(m_gatt);                                                           /**< GATT module instance. */
@@ -177,7 +182,6 @@ static ble_uuid_t m_adv_uuids[]= /**< Universally unique service identifier. */
 {
   {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE},
   {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE},
-//  {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE},
 };
 
 
@@ -190,9 +194,11 @@ static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;        
 
 //ant_bpwr_simulator_t m_ant_bpwr_simulator;    /**< Simulator used to simulate profile data. */
 
+#define REPORT_INTERVAL APP_TIMER_TICKS(100)
 
 APP_TIMER_DEF(m_measure_timer_id);
 APP_TIMER_DEF(m_inertial_timer_id);
+APP_TIMER_DEF(m_report_timer_id);
 
 static void advertising_start(bool erase_bonds); 
 
@@ -233,23 +239,40 @@ bool app_shutdown_handler(nrf_pwr_mgmt_evt_t event)
 }
 NRF_PWR_MGMT_HANDLER_REGISTER(app_shutdown_handler,0);
 
-
-
-
-
-
-
-
 /** @snippet [ANT BPWR simulator call] */
-
-
-
-
 
 uint32_t		m_flag_measure = 0;
 static void inertial_timeout_handler(void * p_context)
 {
   
+}
+//uint8_t ttt;
+void handler_report_evt(bool act,uint16_t interval)
+{
+  NRF_LOG_INFO("Report interval:%d, ticks=",interval,APP_TIMER_TICKS(interval));
+  uint32_t err_code;
+  if(act){
+    if(interval >= 5)
+      err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(interval),NULL);
+    else
+      err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(50),NULL);
+    APP_ERROR_CHECK(err_code);
+  }
+  else{
+    err_code = app_timer_stop(m_report_timer_id);
+    APP_ERROR_CHECK(err_code);
+  }
+}
+void report_timeout_handler(void *p_context)
+{
+  //NRF_LOG_INFO(__func__);
+  uint8_t buf[20];
+//  for(uint8_t i=0;i<20;i++)
+//    buf[i] = ttt;
+  memcpy(&buf[0],adc_buffer,8);
+  memcpy(&buf[8],bmi_buffer,12);
+  app_ble_nus_feed_data(buf,20);
+//  ttt++;
 }
 static void measure_timeout_handler(void * p_context)
 {
@@ -330,6 +353,7 @@ static void advertising_init(void)
     init.config.ble_adv_fast_enabled  = true;
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
     init.config.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
+    //init.config.ble
 
     init.evt_handler = on_adv_evt;
     
@@ -358,7 +382,11 @@ static void timers_init(void)
                             APP_TIMER_MODE_REPEATED,
                             inertial_timeout_handler);
     APP_ERROR_CHECK(err_code);
-    
+
+    err_code = app_timer_create(&m_report_timer_id,
+                                APP_TIMER_MODE_REPEATED,
+                                report_timeout_handler);
+    APP_ERROR_CHECK(err_code);    
     
 }
 
@@ -404,15 +432,16 @@ static void services_init(void)
     };
 
     // Initialize the async SVCI interface to bootloader.
-    err_code = ble_dfu_buttonless_async_svci_init();
-    APP_ERROR_CHECK(err_code);
+    if(NRF_UICR->NRFFW[0] != 0xffffffff){
+      err_code = ble_dfu_buttonless_async_svci_init();
+      APP_ERROR_CHECK(err_code);
+    }    
     
-    
-    err_code = ble_dfu_buttonless_init(&dfus_init);
-    APP_ERROR_CHECK(err_code);
+//    err_code = ble_dfu_buttonless_init(&dfus_init);
+//    APP_ERROR_CHECK(err_code);
 
     // NUS service
-    app_ble_nus_init();
+    app_ble_nus_init(handler_report_evt);
     
 }
 
@@ -508,27 +537,39 @@ static void sleep_mode_enter(void)
 static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
     uint32_t err_code;
+    ble_gap_phys_t phy;
+    phy.rx_phys = BLE_GAP_PHY_2MBPS | BLE_GAP_PHY_1MBPS;
+    phy.tx_phys = BLE_GAP_PHY_2MBPS | BLE_GAP_PHY_1MBPS;
 
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Connected");
-            err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
-            APP_ERROR_CHECK(err_code);
+            //err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
+            //APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+//            if(p_ble_evt->evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH){
+//              NRF_LOG_INFO("Connect as peripheral");
+//              err_code = sd_ble_gap_phy_update(m_conn_handle, &phy);
+//              APP_ERROR_CHECK(err_code);
+//            }else{
+//              NRF_LOG_INFO("Connect as central");
+//            }         
+            sd_ble_gap_adv_stop();
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("Disconnected");
-            err_code = bsp_indication_set(BSP_INDICATE_IDLE);
-            APP_ERROR_CHECK(err_code);
+            //err_code = bsp_indication_set(BSP_INDICATE_IDLE);
+            //APP_ERROR_CHECK(err_code);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
+            advertising_start(false);
             break;
 
 #if defined(S132)
         case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
         {
-            NRF_LOG_DEBUG("PHY update request.");
+            NRF_LOG_INFO("PHY update request.");
             ble_gap_phys_t const phys =
             {
                 .rx_phys = BLE_GAP_PHY_AUTO,
@@ -537,9 +578,19 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
             APP_ERROR_CHECK(err_code);
         } break;
+        case BLE_GAP_EVT_PHY_UPDATE:
+        {
+          ble_gap_evt_phy_update_t phy_update = p_ble_evt->evt.gap_evt.params.phy_update;
+          if(phy_update.status == BLE_HCI_STATUS_CODE_SUCCESS)
+          {
+          NRF_LOG_INFO("PHY updated: %i, %i", phy_update.tx_phy, phy_update.rx_phy);
+          //app_aggregator_phy_update(p_ble_evt->evt.gap_evt.conn_handle, phy_update.tx_phy, phy_update.rx_phy);
+          }
+        } break;
 #endif
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
+            NRF_LOG_INFO("gap evt sec params request.");
             // Pairing not supported
             err_code = sd_ble_gap_sec_params_reply(m_conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
             APP_ERROR_CHECK(err_code);
@@ -733,6 +784,13 @@ static void ble_stack_init(void)
     err_code = nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
     APP_ERROR_CHECK(err_code);
 
+//    ble_cfg_t ble_cfg;
+//    memset(&ble_cfg,0,sizeof(ble_cfg_t));
+//    ble_cfg.conn_cfg.conn_cfg_tag = APP_BLE_CONN_CFG_TAG;
+//    ble_cfg.conn_cfg.params.gatts_conn_cfg.hvn_tx_queue_size = 5;
+//    err_code = sd_ble_cfg_set(BLE_CONN_CFG_GATTS,&ble_cfg,ram_start);
+//    APP_ERROR_CHECK(err_code);
+    
     // Enable BLE stack.
     err_code = nrf_sdh_ble_enable(&ram_start);
     APP_ERROR_CHECK(err_code);
@@ -795,7 +853,7 @@ void gatt_init(void)
     err_code = nrf_ble_gatt_init(&m_gatt, gatt_evt_handler);
     APP_ERROR_CHECK(err_code);
 
-    err_code = nrf_ble_gatt_att_mtu_periph_set(&m_gatt, 64);
+    err_code = nrf_ble_gatt_att_mtu_periph_set(&m_gatt, BIN_PKT_SZ+3);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -877,6 +935,8 @@ static void hal_init(void)
   
   err_code = nrf_drv_gpiote_init();
   APP_ERROR_CHECK(err_code);
+  
+  bsp_board_leds_init();
 }
 
 static void sys_evt_dispatch(uint32_t sys_evt)
@@ -1010,8 +1070,14 @@ static void advertising_start(bool erase_bonds)
         NRF_LOG_DEBUG("advertising is started");
     }
 }
+uint16_t adc_cntr = 0;
+void adc_drdy(void){
+  adc_cntr++;
+}
 
-
+void bmi_drdy(void){
+  
+}
 
 #define USE_SD   1
 uint32_t loopCount = 0;
@@ -1026,28 +1092,32 @@ int main(void)
   hal_init();
   timers_init();
   power_management_init();
-  //buttons_leds_init();
+  
   ble_stack_init();
-  //peer_manage_init();
   gap_params_init();
   gatt_init();
   services_init();
   advertising_init();
   conn_params_init();
   
+  sys_param_init();
+  //peer_manage_init();
   bmi160_cmd_init();
   ad7124cmd_init();
   ant_bpwr_init();
 
   NRF_LOG_INFO("Application started\n");
+  ad7124cmd_startConversion(adc_drdy, adc_buffer);
+  bmi160_cms_startConv(bmi_drdy,bmi_buffer);
+
   application_timers_start();
   advertising_start(false);
-  ant_bpwr_start();
-  
+  //ant_bpwr_start();
     for (;;)
     {
       if(NRF_LOG_PROCESS() == false)
         nrf_pwr_mgmt_run();
+        //sd_app_evt_wait();
     } 
   
 }

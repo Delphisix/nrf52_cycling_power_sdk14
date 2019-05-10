@@ -2186,6 +2186,12 @@
       </file>
     </group>
     <group>
+      <name>FlashStorage</name>
+      <file>
+        <name>$PROJ_DIR$\source\sysParams.c</name>
+      </file>
+    </group>
+    <group>
       <name>Fusion</name>
       <file>
         <name>$PROJ_DIR$\source\fusion_bosch.c</name>

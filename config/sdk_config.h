@@ -2287,7 +2287,7 @@
 // <1=> NRF_FSTORAGE_NVMC 
 // <2=> NRF_FSTORAGE_SD 
 
-#ifndef FDS_BACKEND
+#ifndef _BACKEND
 #define FDS_BACKEND 2
 #endif
 
@@ -4896,7 +4896,7 @@
 // <4=> Debug 
 
 #ifndef NRF_SDH_BLE_LOG_LEVEL
-#define NRF_SDH_BLE_LOG_LEVEL 3
+#define NRF_SDH_BLE_LOG_LEVEL 4
 #endif
 
 // <o> NRF_SDH_BLE_INFO_COLOR  - ANSI escape code prefix.
@@ -4947,7 +4947,7 @@
 // <4=> Debug 
 
 #ifndef NRF_SDH_LOG_LEVEL
-#define NRF_SDH_LOG_LEVEL 3
+#define NRF_SDH_LOG_LEVEL 4
 #endif
 
 // <o> NRF_SDH_INFO_COLOR  - ANSI escape code prefix.
@@ -5112,22 +5112,22 @@
 //==========================================================
 // <o> NRF_SDH_BLE_PERIPHERAL_LINK_COUNT - Maximum number of peripheral links. 
 #ifndef NRF_SDH_BLE_PERIPHERAL_LINK_COUNT
-#define NRF_SDH_BLE_PERIPHERAL_LINK_COUNT 4
+#define NRF_SDH_BLE_PERIPHERAL_LINK_COUNT 1
 #endif
 
 // <o> NRF_SDH_BLE_CENTRAL_LINK_COUNT - Maximum number of central links. 
 #ifndef NRF_SDH_BLE_CENTRAL_LINK_COUNT
-#define NRF_SDH_BLE_CENTRAL_LINK_COUNT 4
+#define NRF_SDH_BLE_CENTRAL_LINK_COUNT 1
 #endif
 
 // <o> NRF_SDH_BLE_TOTAL_LINK_COUNT - Maximum number of total concurrent connections using the default configuration. 
 #ifndef NRF_SDH_BLE_TOTAL_LINK_COUNT
-#define NRF_SDH_BLE_TOTAL_LINK_COUNT 8
+#define NRF_SDH_BLE_TOTAL_LINK_COUNT 1
 #endif
 
 // <o> NRF_SDH_BLE_GAP_EVENT_LENGTH - The time set aside for this connection on every connection interval in 1.25 ms units. 
 #ifndef NRF_SDH_BLE_GAP_EVENT_LENGTH
-#define NRF_SDH_BLE_GAP_EVENT_LENGTH 3
+#define NRF_SDH_BLE_GAP_EVENT_LENGTH 100
 #endif
 
 // <o> NRF_SDH_BLE_GATT_MAX_MTU_SIZE - Static maximum MTU size. 
@@ -5142,7 +5142,7 @@
 
 // <o> NRF_SDH_BLE_VS_UUID_COUNT - The number of vendor-specific UUIDs. 
 #ifndef NRF_SDH_BLE_VS_UUID_COUNT
-#define NRF_SDH_BLE_VS_UUID_COUNT 5
+#define NRF_SDH_BLE_VS_UUID_COUNT 2
 #endif
 
 // <q> NRF_SDH_BLE_SERVICE_CHANGED  - Include the Service Changed characteristic in the Attribute Table.
@@ -5411,14 +5411,14 @@
 // <i> Priority with which BLE events are dispatched to the GATT Service Client.
 
 #ifndef NRF_BLE_GATTS_C_BLE_OBSERVER_PRIO
-#define NRF_BLE_GATTS_C_BLE_OBSERVER_PRIO 2
+#define NRF_BLE_GATTS_C_BLE_OBSERVER_PRIO 1
 #endif
 
 // <o> NRF_BLE_GATT_BLE_OBSERVER_PRIO  
 // <i> Priority with which BLE events are dispatched to the GATT module.
 
 #ifndef NRF_BLE_GATT_BLE_OBSERVER_PRIO
-#define NRF_BLE_GATT_BLE_OBSERVER_PRIO 2
+#define NRF_BLE_GATT_BLE_OBSERVER_PRIO 1
 #endif
 
 // <o> NRF_BLE_QWR_BLE_OBSERVER_PRIO  

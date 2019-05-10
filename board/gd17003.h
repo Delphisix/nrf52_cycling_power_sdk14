@@ -50,6 +50,10 @@ extern "C" {
 #define LEDS_NUMBER    1
 
 #define LED_BLINK      8
+  
+#define LEDS_LIST { LED_BLINK}
+#define LEDS_ACTIVE_STATE 0
+
  
 #define AD7124_CS_PIN   15
 #define AD7124_SCK_PIN  14

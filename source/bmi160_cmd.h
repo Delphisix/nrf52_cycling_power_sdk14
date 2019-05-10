@@ -33,4 +33,6 @@ void bmi160_cmd_start(bool intEn);
 void bmi160_cmd_stop(void);
 void bmi160_cmd_set_odr(uint8_t odr);
 int8_t bmi160_cmd_singleshot(uint8_t *ptr);
+int8_t bmi160_cms_startConv(bmi_callback f, uint8_t *buf);
+
 #endif

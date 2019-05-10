@@ -75,7 +75,7 @@
 #elif defined(BOARD_CUSTOM)
   #include "custom_board.h"
 #elif defined(BOARD_GI17003)
-  #include "bcm_board.h"
+  #include "gd17003.h"
 #else
 #error "Board is not defined"
 

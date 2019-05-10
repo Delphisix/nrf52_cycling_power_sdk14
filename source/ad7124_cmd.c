@@ -19,9 +19,8 @@ void ad7124_delay(uint32_t period);
 int8_t ad7124_conversion_done(void *p);
 void ad7124_int_isr(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 uint8_t currChannel = 0;
-typedef void (*adc_callback)(void);
 int32_t *buffer;
-adc_callback f_cb = NULL;
+static adc_callback f_cb = NULL;
 
 static const nrf_drv_spi_t ad7124_spi = NRF_DRV_SPI_INSTANCE(0);
 static int32_t adResult[16];
@@ -30,7 +29,7 @@ uint8_t goStop = 0;
 
 ad7124_channel_t channels[] = {
   {.u={3,2,0,0,ADC_BIT_ENABLE}},
-  {.u={4,5,0,0,ADC_BIT_ENABLE}},
+  {.u={5,4,0,0,ADC_BIT_ENABLE}},
   {.u={11,10,0,0,ADC_BIT_DISABLE}},
   {.u={15,14,0,0,ADC_BIT_DISABLE}},
   {.u={9,8,0,0,ADC_BIT_DISABLE}},
@@ -171,17 +170,22 @@ int8_t ad7124cmd_conversion()
 
 int8_t ad7124cmd_startConversion(adc_callback f, int32_t* b)
 {
-  if(f) f_cb = f;
-  if(b) buffer = b;
+  if(!f) return -1;
+  if(!b) return -2; 
+  
+  buffer = b;
+  f_cb = f;
   
   for(uint8_t i=0;i<8;i++){
     ad7124.config->channels[i].u.enable = ADC_BIT_DISABLE;
   }
   currChannel = 0;
+  goStop = 0;
   ad7124.config->channels[currChannel].u.enable = ADC_BIT_ENABLE;
   ad7124.config->iDrv[0].iout = ADC_IOUT_500UA;
+  ad7124_config_channel(&ad7124);
   ad7124_setmode(AD7124_MODE_CONTINUE,&ad7124);  
-  
+  return 0;
 }
 
 int8_t ad7124cmd_goStop()
@@ -254,17 +258,27 @@ void ad7124_delay(uint32_t period)
 
 int8_t ad7124_conversion_done(void *p)
 {
-  if(f_cb){
+  ad7124.chipSel(1);
+
+  if(f_cb && (currChannel == 1)){
     buffer[0] = adResult[0];
     buffer[1] = adResult[1];
     f_cb();
   }
   
+  ad7124.config->channels[currChannel++].u.enable = ADC_BIT_DISABLE;
+  if(currChannel == 2)
+    currChannel = 0;
+  ad7124.config->channels[currChannel].u.enable = ADC_BIT_ENABLE;
+  ad7124_config_channel(&ad7124);
+
+  
   if(goStop){
-    goStop = 0;
-    return 0;
+    ad7124_stop(&ad7124);
+    return AD7124_STOP_OP;
   }else{
-    return 1;
+    ad7124.chipSel(0);
+    return AD7124_OK;
   }
 //  ad7124.chipSel(1);
 //  ad7124.config->channels[appParam.actChannel].u.enable = ADC_BIT_DISABLE;

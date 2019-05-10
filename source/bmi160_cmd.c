@@ -12,13 +12,12 @@
 #include "bmi160.h"
 #include "bmi160_cmd.h"
 
-#include "fusion_bosch.h"
 
 
 #define AR(x,y,z) ((x <=y) && (y <= z))
 static const nrf_drv_spi_t bmi_spi = NRF_DRV_SPI_INSTANCE(1);
 
-bmi_callback f_cb;
+static bmi_callback f_cb;
 uint8_t *f_buf;
 
 // bmi160
@@ -201,12 +200,12 @@ int8_t bmi160_cmd_pwdn(struct bmi160_dev *dev)
 int8_t bmi160_cmd_pwup(struct bmi160_dev *dev)
 {
   dev->accel_cfg.power = BMI160_ACCEL_NORMAL_MODE;
-  dev->accel_cfg.odr = BMI160_ACCEL_ODR_100HZ;
+  dev->accel_cfg.odr = BMI160_ACCEL_ODR_200HZ;
   dev->accel_cfg.range = BMI160_ACCEL_RANGE_2G;
   dev->accel_cfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
 //  
   dev->gyro_cfg.power = BMI160_GYRO_NORMAL_MODE;
-  dev->gyro_cfg.odr = BMI160_GYRO_ODR_25HZ;
+  dev->gyro_cfg.odr = BMI160_GYRO_ODR_200HZ;
   dev->gyro_cfg.range = BMI160_GYRO_RANGE_2000_DPS;
   dev->gyro_cfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
   return bmi160_update_sensor_config(dev);
@@ -372,10 +371,18 @@ void bmi160_cmd_start(bool intEn)
 //  nrf_drv_gpiote_in_event_enable(BMI160_INT2_PIN,true);  
 }
 
-void bmi160_cms_startConv(bmi_callback f, uint8_t *buf)
+int8_t bmi160_cms_startConv(bmi_callback f, uint8_t *buf)
 {
-  if(f) f_cb = f;
-  if(buf) f_buf = buf;
+  if(!f) return -1;
+  if(!buf) return -1; 
+   f_cb = f;
+  f_buf = buf;
+  bmi160_cmd_pwup(&bmi160);
+  bmi160_cmd_config_int_am(&bmi160,0);
+  bmi160_cmd_config_int(&bmi160,1);
+  nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
+
+  return 0;
 }
 
 void bmi160_cmd_stop(void)
@@ -393,10 +400,6 @@ void bmi160_cmd_set_odr(uint8_t odr)
 
 int8_t bmi160_cmd_singleshot(uint8_t *ptr)
 {
-  //int8_t rslt = BMI160_OK;
-  //struct bmi160_sensor_data *accel = (struct bmi160_sensor_data*)(ptr);
-  //struct bmi160_sensor_data *gyro  = (struct bmi160_sensor_data*)(ptr+10);
-  //bmi160_get_sensor_data((BMI160_ACCEL_SEL | BMI160_GYRO_SEL), accel, gyro, &bmi160);
   bmi160_get_regs(BMI160_GYRO_DATA_ADDR, ptr, 12, &bmi160);
   return 12;
 }
