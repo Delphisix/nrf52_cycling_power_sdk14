@@ -946,7 +946,7 @@
  
 
 #ifndef PPI_ENABLED
-#define PPI_ENABLED 0
+#define PPI_ENABLED 1
 #endif
 
 // <e> PWM_ENABLED - nrf_drv_pwm - PWM peripheral driver
@@ -1645,7 +1645,7 @@
  
 
 #ifndef TIMER1_ENABLED
-#define TIMER1_ENABLED 0
+#define TIMER1_ENABLED 1
 #endif
 
 // <q> TIMER2_ENABLED  - Enable TIMER2 instance
@@ -3076,7 +3076,7 @@
 // <4=> Debug 
 
 #ifndef NRF_LOG_DEFAULT_LEVEL
-#define NRF_LOG_DEFAULT_LEVEL 3
+#define NRF_LOG_DEFAULT_LEVEL 4
 #endif
 
 // <q> NRF_LOG_DEFERRED  - Enable deffered logger.
@@ -5112,7 +5112,7 @@
 //==========================================================
 // <o> NRF_SDH_BLE_PERIPHERAL_LINK_COUNT - Maximum number of peripheral links. 
 #ifndef NRF_SDH_BLE_PERIPHERAL_LINK_COUNT
-#define NRF_SDH_BLE_PERIPHERAL_LINK_COUNT 1
+#define NRF_SDH_BLE_PERIPHERAL_LINK_COUNT 2
 #endif
 
 // <o> NRF_SDH_BLE_CENTRAL_LINK_COUNT - Maximum number of central links. 
@@ -5142,7 +5142,7 @@
 
 // <o> NRF_SDH_BLE_VS_UUID_COUNT - The number of vendor-specific UUIDs. 
 #ifndef NRF_SDH_BLE_VS_UUID_COUNT
-#define NRF_SDH_BLE_VS_UUID_COUNT 2
+#define NRF_SDH_BLE_VS_UUID_COUNT 3
 #endif
 
 // <q> NRF_SDH_BLE_SERVICE_CHANGED  - Include the Service Changed characteristic in the Attribute Table.
@@ -5688,6 +5688,10 @@
 #define NRF_DFU_HW_VERSION 10
 #endif
 
+   
+#ifndef SENSOR_NODE_ENABLED
+#define SENSOR_NODE_ENABLED 1
+#endif
 
 
 // </h> 

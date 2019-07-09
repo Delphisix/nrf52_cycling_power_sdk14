@@ -87,16 +87,11 @@
 #include "ant_boot_settings_api.h"
 
 #include "ad7124_cmd.h"
-//#include "ad7124_config.h"
 #include "bmi160.h"
-//#include "bmi160_config.h"
 #include "bmi160_cmd.h"
 #include "peripheral_if.h"
 
 
-//#include "app_ble_uart.h"
-#include "app_ble_nus_peripheral.h"
-#include "app_ant_bpwr.h"
 
 #include "ble_hci.h"
 #include "ble_advdata.h"
@@ -116,7 +111,6 @@
 #include "nrf_log_default_backends.h"
 #include "nrf_sdh.h"
    
-#include "nrf52_ble_dfu.h"
 #include "nrf_ble_gatt.h"
 #include "ble_advdata.h"
 #include "ble_advertising.h"
@@ -125,8 +119,18 @@
 #include "nrf_sdh_soc.h"
 #include "app_timer.h"
 #include "peer_manager.h"
-   
+#include "app_adc.h"   
 #include "sysparams.h"
+
+//#include "app_ble_uart.h"
+#include "app_ble_nus_peripheral.h"
+#include "app_ant_bpwr.h"
+#include "nrf52_ble_dfu.h"
+   
+#include "sensorData.h"
+#include "ble_sensor_node.h"
+
+
 
 #define MODIFICATION_TYPE_BUTTON 0 /* predefined value, MUST REMAIN UNCHANGED */
 #define MODIFICATION_TYPE_AUTO   1 /* predefined value, MUST REMAIN UNCHANGED */
@@ -142,7 +146,7 @@
 
 #define APP_TIMER_PRESCALER         0 /**< Value of the RTC1 PRESCALER register. */
 #define APP_TIMER_OP_QUEUE_SIZE     0x04 /**< Size of timer operation queues. */
-#define CALIBRATION_DATA            0x55AAu /**< General calibration data value. */
+//#define CALIBRATION_DATA            0x55AAu /**< General calibration data value. */
 
 #define POLL_INTERVAL   50      // ms
 #define POLL_TICKS      (POLL_INTERVAL*2048)/1000
@@ -167,27 +171,46 @@ static uint8_t testTorque = 0;
 
 static uint16_t timeout_secs = 0;
 
+
 app_gpiote_user_id_t m_app_gpiote_my_id;
 app_gpiote_user_id_t  id_ad7124;
 app_gpiote_user_id_t  id_adxl335;
-int32_t adc_buffer[2];
+uint32_t adc_buffer[2];
 uint8_t bmi_buffer[12];
-
+void adc_drdy(void);
+void bmi_drdy(void);
 
 //BLE_NUS_DEF(m_nus);                                                                 /**< BLE NUS service instance. */
+//BLE_SENSORNODE_DEF(m_snode);
 NRF_BLE_GATT_DEF(m_gatt);                                                           /**< GATT module instance. */
 BLE_ADVERTISING_DEF(m_advertising);
+static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
+static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;            /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 
 static ble_uuid_t m_adv_uuids[]= /**< Universally unique service identifier. */
 {
   {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE},
-  {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE},
+//  {BLE_UUID_SENSORNODE_SERVICE, BLE_SENSORNODE_SERVICE_UUID_TYPE},
+//  {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE},
 };
 
 
-static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
-static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;            /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 
+/**@brief Function for assert macro callback.
+ *
+ * @details This function will be called in case of an assert in the SoftDevice.
+ *
+ * @warning This handler is an example only and does not fit a final product. You need to analyse
+ *          how your product is supposed to react in case of Assert.
+ * @warning On assert from the SoftDevice, the system can only recover on reset.
+ *
+ * @param[in] line_num    Line number of the failing ASSERT call.
+ * @param[in] p_file_name File name of the failing ASSERT call.
+ */
+void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
+{
+    app_error_handler(DEAD_BEEF, line_num, p_file_name);
+}
 
 //ant_bpwr_profile_t m_ant_bpwr;
 /** @snippet [ANT BPWR TX Instance] */
@@ -201,7 +224,7 @@ APP_TIMER_DEF(m_inertial_timer_id);
 APP_TIMER_DEF(m_report_timer_id);
 
 static void advertising_start(bool erase_bonds); 
-
+static void advertising_reconfig();
 bool m_is_ready = false;
 bool m_sysoff_started;
 //bool app_shutdown_handler(nrf_pwr_mgmt_evt_t event);
@@ -246,34 +269,47 @@ static void inertial_timeout_handler(void * p_context)
 {
   
 }
-//uint8_t ttt;
+
 void handler_report_evt(bool act,uint16_t interval)
 {
   NRF_LOG_INFO("Report interval:%d, ticks=",interval,APP_TIMER_TICKS(interval));
   uint32_t err_code;
   if(act){
-    if(interval >= 5)
+//    ad7124_cmd_config();    
+//    ad7124cmd_startConversion();
+//    bmi160_cms_startConv();    
+    if(interval >= 5){
       err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(interval),NULL);
+    }
     else
       err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(50),NULL);
     APP_ERROR_CHECK(err_code);
   }
   else{
+//    ad7124cmd_goStop();
+//    bmi160_cmd_stop();
     err_code = app_timer_stop(m_report_timer_id);
     APP_ERROR_CHECK(err_code);
   }
 }
+
 void report_timeout_handler(void *p_context)
 {
   //NRF_LOG_INFO(__func__);
   uint8_t buf[20];
-//  for(uint8_t i=0;i<20;i++)
-//    buf[i] = ttt;
   memcpy(&buf[0],adc_buffer,8);
   memcpy(&buf[8],bmi_buffer,12);
   app_ble_nus_feed_data(buf,20);
-//  ttt++;
 }
+//void report_timeout_handler(void *p_context)
+//{
+//  //NRF_LOG_INFO(__func__);
+//  uint8_t buf[20];
+//  memcpy(&buf[0],&appParam.pitch,4);
+//  memcpy(&buf[4],&appParam.pitch_prev,4);
+//  memcpy(&buf[8],&appParam.torque_nm[0],4);
+//  app_ble_nus_feed_data(buf,12);
+//}
 static void measure_timeout_handler(void * p_context)
 {
   UNUSED_PARAMETER(p_context);
@@ -315,15 +351,23 @@ static void measure_timeout_handler(void * p_context)
  */
 static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 {
+  NRF_LOG_INFO("FUNC:%s, code:%d",__func__,ble_adv_evt);
     uint32_t err_code;
 
     switch (ble_adv_evt)
     {
         case BLE_ADV_EVT_FAST:
-            err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-            APP_ERROR_CHECK(err_code);
+          
+//            err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+//            APP_ERROR_CHECK(err_code);
             break;
         case BLE_ADV_EVT_IDLE:
+          if(m_conn_handle == BLE_CONN_HANDLE_INVALID){
+            appParam.state = ST_IDLE;
+            NRF_LOG_INFO("BLE ADV IDLE");
+          }
+          //advertising_reconfig();
+            //advertising_start(false);
             //sleep_mode_enter();
             break;
         default:
@@ -332,7 +376,14 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 }
 
 /*********  main code section ********************/
-
+static void advertising_reconfig()
+{
+  for(uint8_t i=0;i<m_advertising.advdata.p_manuf_specific_data->data.size;i++){
+    m_advertising.advdata.p_manuf_specific_data->data.p_data[i]++;
+  }
+  //sd_ble_gap_adv_data_set
+  advertising_start(false);
+}
 
 /**@brief Function for initializing the Advertising functionality.
  */
@@ -342,10 +393,19 @@ static void advertising_init(void)
     ble_advertising_init_t init;
 
     memset(&init, 0, sizeof(init));
+    
+    ble_advdata_manuf_data_t    m_data;
+    uint8_t data[] = "Hello, Grididea";
+    m_data.company_identifier = 0x5329;
+    m_data.data.p_data = data;
+    m_data.data.size = sizeof(data);
+    
+    //init.advdata.p_manuf_specific_data = &m_data;
 
     init.advdata.name_type          = BLE_ADVDATA_FULL_NAME;
     init.advdata.include_appearance = false;
-    init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+//    init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
+    init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
 
     init.srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
     init.srdata.uuids_complete.p_uuids  = m_adv_uuids;
@@ -353,7 +413,6 @@ static void advertising_init(void)
     init.config.ble_adv_fast_enabled  = true;
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
     init.config.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
-    //init.config.ble
 
     init.evt_handler = on_adv_evt;
     
@@ -406,6 +465,8 @@ static void gap_params_init(void)
     err_code = sd_ble_gap_device_name_set(&sec_mode,
                                           (const uint8_t *) DEVICE_NAME,
                                           strlen(DEVICE_NAME));
+//                                          (const uint8_t *) moduleParam.appName,
+//                                          strlen(moduleParam.appName));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -442,6 +503,9 @@ static void services_init(void)
 
     // NUS service
     app_ble_nus_init(handler_report_evt);
+    
+    // sensornode service
+    //app_sensornode_init();
     
 }
 
@@ -548,6 +612,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             //err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             //APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+            //set_conn_handle(m_conn_handle);
+            appParam.state = ST_CONNECTED;
 //            if(p_ble_evt->evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH){
 //              NRF_LOG_INFO("Connect as peripheral");
 //              err_code = sd_ble_gap_phy_update(m_conn_handle, &phy);
@@ -563,7 +629,9 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             //err_code = bsp_indication_set(BSP_INDICATE_IDLE);
             //APP_ERROR_CHECK(err_code);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
-            advertising_start(false);
+            set_conn_handle(m_conn_handle);
+            appParam.state = ST_DISCONNECTED;
+//            (false);
             break;
 
 #if defined(S132)
@@ -1057,6 +1125,7 @@ static void delete_bonds(void)
  */
 static void advertising_start(bool erase_bonds)
 {
+  NRF_LOG_INFO(__func__);
     if (erase_bonds == true)
     {
         delete_bonds();
@@ -1071,15 +1140,24 @@ static void advertising_start(bool erase_bonds)
     }
 }
 uint16_t adc_cntr = 0;
-void adc_drdy(void){
+void adc_drdy(void)
+{
   adc_cntr++;
+  sensorDataFeedADC(0,adc_buffer[0]>>8);
 }
 
-void bmi_drdy(void){
-  
+void bmi_drdy(void)
+{
+  //NRF_LOG_INFO("BMI Interrupt");
+  if(appParam.state == ST_IDLE){
+    //NRF_LOG_INFO("Start adv");
+//    advertising_start(false);
+  }
+  //todo: feed IMU data to filter and fusion
+  sensorDataFeedIMU(bmi_buffer);
 }
 
-#define USE_SD   1
+#define USE_SD   0
 uint32_t loopCount = 0;
 uint32_t hclk_run;
 //static EventQueue eventQueue(16*32);
@@ -1092,7 +1170,6 @@ int main(void)
   hal_init();
   timers_init();
   power_management_init();
-  
   ble_stack_init();
   gap_params_init();
   gatt_init();
@@ -1101,23 +1178,36 @@ int main(void)
   conn_params_init();
   
   sys_param_init();
+
+  //app_adc_init();
   //peer_manage_init();
-  bmi160_cmd_init();
-  ad7124cmd_init();
+  bmi160_cmd_init(bmi_drdy,bmi_buffer);
+  ad7124cmd_init(adc_drdy, adc_buffer);
+  uint16_t rate = 25*(1 << (moduleParam.imu_rate_code-0x6));
+  sensorDataInit(rate);
+  appParam.adc_ptr = adc_buffer;
+  appParam.bmi_ptr = bmi_buffer;
+
   ant_bpwr_init();
+  
+  
 
   NRF_LOG_INFO("Application started\n");
-  ad7124cmd_startConversion(adc_drdy, adc_buffer);
-  bmi160_cms_startConv(bmi_drdy,bmi_buffer);
+  ad7124cmd_startConversion();
+  bmi160_cms_startConv();
 
+//  bmi160_cmd_start_anymotion();
   application_timers_start();
   advertising_start(false);
+  appParam.state = ST_ADVING;
+  //app_adc_start();
   //ant_bpwr_start();
     for (;;)
     {
-      if(NRF_LOG_PROCESS() == false)
+      if(NRF_LOG_PROCESS() == false){
         nrf_pwr_mgmt_run();
-        //sd_app_evt_wait();
+        //power_manage();
+      }
     } 
   
 }

@@ -41,7 +41,7 @@ int32_t ticks, period;
 
 #define INACTIVE_THRESHOLD      BMI160_GYRO_ODR*200     // bmi byro odr(25)*4
 uint32_t inactiveCntr;
-appParam_t appParam;
+//appParam_t appParam;
 uint8_t bmidata[12];
 
 double mvv[2];
@@ -84,12 +84,12 @@ void peripheral_init(void)
 
   
   
-  appParam.torque.isPositive = false;
-  appParam.torque.valid = false;
-  appParam.torque.defined = false;
-  appParam.torque.cycleCount = 0;
-  appParam.torque.cycleTorq = 0;
-  appParam.goStop = false;
+//  appParam.torque.isPositive = false;
+//  appParam.torque.valid = false;
+//  appParam.torque.defined = false;
+//  appParam.torque.cycleCount = 0;
+//  appParam.torque.cycleTorq = 0;
+//  appParam.goStop = false;
   //simulateTorque(50,40,20,2);
 
 
@@ -106,7 +106,7 @@ void peripheral_start(void)
   //nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
   //nrf_drv_gpiote_in_event_enable(BMI160_INT2_PIN,true);
   inactiveCntr = 0;
-  appParam.state = SYS_NORMAL;
+  //appParam.state = SYS_NORMAL;
 }
 
 void peripheral_stop(void)
@@ -149,8 +149,8 @@ int32_t getPeriod(void)
   avgz /= SENSORDATA_BUFFER_SIZE;
   
   v = avgz * REV_PER_SEC;
-  appParam.rpm = 60*v;
-  if(appParam.rpm > 255) appParam.rpm = 0;
+  //appParam.rpm = 60*v;
+  //if(appParam.rpm > 255) appParam.rpm = 0;
   v = 1.0/v;
   v *= 2048;
   period = (int32_t)(v);
@@ -165,7 +165,7 @@ int32_t getPeriod(void)
 int32_t getRPM(void)
 {
   
-  return appParam.rpm;
+  return 0;
 }
 
 //enum {
@@ -181,7 +181,7 @@ int32_t getRPM(void)
 uint16_t getTorque(void)
 { 
 #ifdef REPORT_STATIC
-  return lround(appParam.staticTorque*32); 
+  return lround(0); 
 #else
   double dv = 0;
   uint8_t act = 0;
@@ -205,7 +205,7 @@ uint16_t getTorque(void)
 
 uint16_t getPower(void)
 {
-  return appParam.power;
+  //return appParam.power;
 }
 
 void peripheralVars_init(void)
@@ -222,7 +222,7 @@ void peripheralVars_init(void)
 
 sysstate_t sysGetState(void)
 {
-  return appParam.state;
+  //return appParam.state;
 }
 
 

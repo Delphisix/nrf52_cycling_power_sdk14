@@ -17,6 +17,8 @@ description: ant plus bicycle power application
 #include "ant_bpwr_simulator.h"
 
 #include "app_ant_bpwr.h"
+#include "sysParams.h"
+#include "nrf_log.h"
 
 #define BPWR_CHANNEL_NUMBER         0x00 /**< Channel number assigned to Bicycle Power profile. */
 #define ANTPLUS_NETWORK_NUMBER      0       /**< Network number. */
@@ -65,50 +67,48 @@ void ant_evt_dispatch(ant_evt_t * p_ant_evt)
 /**@brief Function for handling ANT BPWR events.
  */
 /** @snippet [ANT BPWR simulator call] */
-uint32_t sndCntr = 0;
 void ant_bpwr_evt_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_evt_t event)
 {
   uint32_t test = 0;
   int16_t retv;
   int16_t polls;
-  sndCntr++;
+ 
   switch (event)
   {
     case ANT_BPWR_PAGE_1_UPDATED:
-      //test = 1;
-//      m_ant_bpwr.page_1.data.general_calib = 99;
+      m_ant_bpwr.page_1.data.general_calib = ANT_BPWR_CALIB_ID_AUTO_SUPPORT;
+      m_ant_bpwr.page_1.auto_zero_status = ANT_BPWR_AUTO_ZERO_NOT_SUPPORTED;
       break;
             /* fall through */
     case ANT_BPWR_PAGE_16_UPDATED:
       m_ant_bpwr.page_16.update_event_count++;
-//      //m_ant_bpwr.page_18.update_event_count = m_ant_bpwr.page_16.update_event_count;
-//      
-//      //m_ant_bpwr.page_18.period += getPeriod();
-//      m_ant_bpwr.common.instantaneous_cadence = getRPM();
-//      m_ant_bpwr.page_16.instantaneous_power = getPower();
-//      m_ant_bpwr.page_18.accumulated_torque += (uint16_t)getTorque();
+      //m_ant_bpwr.page_16. = (uint16_t)appParam.rpm;
+      m_ant_bpwr.page_16.instantaneous_power = appParam.power;
+      m_ant_bpwr.common.instantaneous_cadence = appParam.rpm;
       break;
             /* fall through */
     case ANT_BPWR_PAGE_17_UPDATED:
-      test = 3;
+      m_ant_bpwr.page_17.update_event_count++;
+      m_ant_bpwr.page_17.accumulated_torque += appParam.torque[0];
+      m_ant_bpwr.page_17.period = 0;
+      m_ant_bpwr.page_17.tick = 0;
+      
       break;
             /* fall through */
     case ANT_BPWR_PAGE_18_UPDATED:
       m_ant_bpwr.page_18.update_event_count++;
-//      m_ant_bpwr.page_18.period += getPeriod();
-//      m_ant_bpwr.page_18.accumulated_torque += (uint16_t)getTorque();
-      // for test
-//      m_ant_bpwr.page_16.instantaneous_power = (uint16_t)lround(torque*testRPM*1000./9549);
-      //m_ant_bpwr.page_16.instantaneous_power = (uint8_t)lround(testTorque*testRPM*1000./9549.);
-
+      m_ant_bpwr.page_18.accumulated_torque += appParam.torque[0];
+      m_ant_bpwr.page_18.tick++;
+      m_ant_bpwr.page_18.period += appParam.period;
+      
       break;
             /* fall through */
     case ANT_BPWR_PAGE_80_UPDATED:
-      test = 5;
+      
       break;
             /* fall through */
     case ANT_BPWR_PAGE_81_UPDATED:
-      test = 6;
+     
       break;
 //    default:
 //      ant_bpwr_simulator_one_iteration(&m_ant_bpwr_simulator, event);
@@ -121,17 +121,25 @@ void ant_bpwr_evt_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_evt_t event)
 /** @snippet [ANT BPWR calibration] */
 void ant_bpwr_calib_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_page1_data_t * p_page1)
 {
+  int32_t tmp;
     switch (p_page1->calibration_id)
     {
         case ANT_BPWR_CALIB_ID_MANUAL:
             m_ant_bpwr.BPWR_PROFILE_calibration_id     = ANT_BPWR_CALIB_ID_MANUAL_SUCCESS;
-            m_ant_bpwr.BPWR_PROFILE_general_calib_data = CALIBRATION_DATA;
+            moduleParam.adcOffset[0] = m_ant_bpwr.page_1.data.custom_calib[4] << 8;
+            moduleParam.adcOffset[0] |= m_ant_bpwr.page_1.data.custom_calib[5];
+            NRF_LOG_INFO("Save parameters manual");
+            sysparam_update();
             break;
 
         case ANT_BPWR_CALIB_ID_AUTO:
             m_ant_bpwr.BPWR_PROFILE_calibration_id     = ANT_BPWR_CALIB_ID_MANUAL_SUCCESS;
             m_ant_bpwr.BPWR_PROFILE_auto_zero_status   = p_page1->auto_zero_status;
             m_ant_bpwr.BPWR_PROFILE_general_calib_data = CALIBRATION_DATA;
+            tmp = (appParam.adc_ptr[0] - 0x80000000) >> 16;
+            moduleParam.adcOffset[0] = (int16_t)tmp;
+            NRF_LOG_INFO("Save parameters auto");
+            sysparam_update();
             break;
 
         case ANT_BPWR_CALIB_ID_CUSTOM_REQ:

@@ -18,6 +18,7 @@ NRF_LOG_MODULE_REGISTER();
 #define REC_KEY 0x9210
 
 module_param_t moduleParam;
+app_param_t appParam;
 
 static volatile bool m_fds_ready = false;
 static volatile bool m_pending_write = false;
@@ -110,6 +111,7 @@ void sys_param_init(void)
  
   sysparam_load();
   
+  moduleParam.state = 0;
 }
 
 ret_code_t sysparam_update(void)
@@ -157,6 +159,7 @@ ret_code_t sysparam_load(void)
     moduleParam.imu_rate_code = 0x8;
     moduleParam.senseoMask = 0xffffffff;
     moduleParam.scan_interval = 50;
+    memcpy(moduleParam.appName,"Grididea BP01\0",14);
     err_code = file_create((uint8_t*)&moduleParam,sizeof(moduleParam));
   }
   return err_code;

@@ -7,12 +7,20 @@
 #include "nrf_drv_saadc.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_timer.h"
+#include "boards.h"
+#include "app_error.h"
+#include "nrf_delay.h"
+#include "app_util_platform.h"
+#include "nrf_pwr_mgmt.h"
+#include "nrf_drv_power.h"
 #include "app_adc.h"
+#include "nrf_log.h"
+#include "sysParams.h"
 
 #define SAMPLES_IN_BUFFER 5
 volatile uint8_t state = 1;
 
-static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(0);
+static const nrf_drv_timer_t m_timer = NRF_DRV_TIMER_INSTANCE(1);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
@@ -75,13 +83,20 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
         APP_ERROR_CHECK(err_code);
 
         int i;
-        NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
-
-        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
-        {
-            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
+        uint16_t sum = 0;
+        for(i=0;i<SAMPLES_IN_BUFFER;i++){
+          sum += m_buffer_pool[0][i];
         }
-        m_adc_evt_counter++;
+        sum /= SAMPLES_IN_BUFFER;
+        appParam.bat_volt = sum * moduleParam.vbatRatio;
+        
+        //NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
+
+//        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
+//        {
+//            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
+//        }
+        //m_adc_evt_counter++;
     }
 }
 
@@ -100,7 +115,18 @@ void saadc_init(void)
     err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
     APP_ERROR_CHECK(err_code);
 
-//    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER);
-//    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER);
+    APP_ERROR_CHECK(err_code);
 
+}
+
+void app_adc_init()
+{
+  saadc_init();
+  saadc_sampling_event_init();
+}
+
+void app_adc_start()
+{
+  saadc_sampling_event_enable();
 }

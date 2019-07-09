@@ -75,43 +75,25 @@
 #include "app_ble_nus_peripheral.h"
 #include "sysparams.h"
 
-extern ble_advertising_t m_advertising;
+//extern ble_advertising_t m_advertising;
 
 actionControl actCtrl = NULL;
 BLE_NUS_DEF(m_nus);                                                                 /**< BLE NUS service instance. */
 
-static uint16_t scan_interval = 1000; // in unit of 100us
+//static uint16_t scan_interval = 1000; // in unit of 100us
 
-static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
-static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;            /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
-static ble_uuid_t m_adv_uuids[]          =                                          /**< Universally unique service identifier. */
-{
-    {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
-};
+//static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
+//static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;            /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
+//static ble_uuid_t m_adv_uuids[]          =                                          /**< Universally unique service identifier. */
+//{
+//    {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
+//};
 
 
 void app_buf_write_cb(uint8_t *b, uint16_t len)
 {
   
 }
-
-/**@brief Function for assert macro callback.
- *
- * @details This function will be called in case of an assert in the SoftDevice.
- *
- * @warning This handler is an example only and does not fit a final product. You need to analyse
- *          how your product is supposed to react in case of Assert.
- * @warning On assert from the SoftDevice, the system can only recover on reset.
- *
- * @param[in] line_num    Line number of the failing ASSERT call.
- * @param[in] p_file_name File name of the failing ASSERT call.
- */
-void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
-{
-    app_error_handler(DEAD_BEEF, line_num, p_file_name);
-}
-
-
 
 /**@brief Function for handling the data from the Nordic UART Service.
  *
@@ -132,12 +114,16 @@ void nus_data_handler(ble_nus_evt_t * p_evt)
     {
         uint32_t err_code;
 
-        NRF_LOG_INFO("Received data from BLE NUS. Writing data on UART.");
+        NRF_LOG_INFO("Received data from BLE NUS.");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
         //actCtrl(true,scan_interval);
+        uint8_t str[]="12345";
+        uint16_t sz=5;
+        //err_code = ble_nus_string_send(&m_nus,str,&sz);
         writePacketBuffer(p_evt->params.rx_data.p_data,p_evt->params.rx_data.length);
     }
     else if(p_evt->type == BLE_NUS_EVT_TX_RDY){
+      NRF_LOG_INFO("TX completed");
           bsp_board_led_off(0);
           txReady = true;
     }
@@ -148,11 +134,11 @@ void nus_data_handler(ble_nus_evt_t * p_evt)
 
 
 // PACKET HANDLE CODE START
-#define REPORT_INTERVAL APP_TIMER_TICKS(100)
-APP_TIMER_DEF(m_report_timer_id);
+//#define REPORT_INTERVAL APP_TIMER_TICKS(100)
+//APP_TIMER_DEF(m_report_timer_id);
 #define PACKET_BUFFER_SIZE      BIN_PKT_SZ
-static uint8_t packet[BIN_PKT_SZ];
-static uint8_t packet2[BIN_PKT_SZ];
+static uint8_t packet[BIN_PKT_SZ*2];
+static uint8_t packet2[BIN_PKT_SZ*2];
 buffer_t pktBuf={packet,packet,packet,packet2,0,0,0};
 
 //void report_timeout_handler(void *p_context)
@@ -187,41 +173,53 @@ void app_ble_nus_feed_data(uint8_t *p, uint8_t sz)
   pktBuf.w += sz;
   pktBuf.szWritten += sz;
   if((pktBuf.szWritten+CMD_STRUCT_SZ) >= BIN_PKT_SZ){
-    buildPacketHeader(MASK_TYPE_DATA|0x7,0x0,(pktBuf.bufId==0?pktBuf.b1:pktBuf.b2),pktBuf.szWritten+CMD_STRUCT_SZ);
+    buildPacketHeader(MASK_TYPE_DATA|0x7,appParam.pid++,(pktBuf.bufId==0?pktBuf.b1:pktBuf.b2),pktBuf.szWritten+CMD_STRUCT_SZ);
     // put into nus buffer
     pktBuf.r = pktBuf.bufId==0?pktBuf.b1:pktBuf.b2;
     pktBuf.w = pktBuf.bufId==0?pktBuf.b2:pktBuf.b1;
     pktBuf.w += CMD_STRUCT_SZ;
     pktBuf.bufId = pktBuf.bufId == 0? 1:0;
-    //pktBuf.szToRead = pktBuf.szWritten;
-    pktBuf.szToRead = BIN_PKT_SZ;
+    pktBuf.szToRead = pktBuf.szWritten + CMD_STRUCT_SZ;
+    //pktBuf.szToRead = BIN_PKT_SZ;
     pktBuf.szWritten = 0;
     //memset(pktBuf.r,vv++,208);
     if(txReady){
-    err = ble_nus_string_send(&m_nus,pktBuf.r,&pktBuf.szToRead);
-    txReady = false;
-    bsp_board_led_on(0);
+      NRF_LOG_INFO("Send size:%d",pktBuf.szToRead);
+      txReady = false;
+      err = ble_nus_string_send(&m_nus,pktBuf.r,&pktBuf.szToRead);
+      bsp_board_led_on(0);
+//      NRF_LOG_INFO("Send result:%d",err);
+      APP_ERROR_CHECK(err);
     }
-    //APP_ERROR_CHECK(err);
 
-    //NRF_LOG_INFO("Send result:%d",err);
   }
+}
+
+void set_conn_handle(uint16_t h)
+{
+  m_nus.conn_handle = h;
 }
 
 void report_cmd_ok(cmd_header_t *h)
 {
+  //return ;
   uint8_t b[8];
   uint8_t pid = (h->type & 0xf) | MASK_TYPE_RET_OK;
   uint16_t len = buildPacket(h->type, pid,NULL,0,b);
-  ble_nus_string_send(&m_nus,b,&len);
+  uint32_t err = ble_nus_string_send(&m_nus,b,&len);
+  APP_ERROR_CHECK(err);
+  NRF_LOG_INFO(__func__,err);
 }
 
 void report_cmd_ng(cmd_header_t *h)
 {
+  //return ;
+  uint32_t err;
   uint8_t b[8];
   uint8_t pid = (h->type & 0xf) | MASK_TYPE_RET_ERR;
   uint16_t len = buildPacket(h->type, pid,NULL,0,b);
-  ble_nus_string_send(&m_nus,b,&len);
+  err = ble_nus_string_send(&m_nus,b,&len);
+  APP_ERROR_CHECK(err);
 }
 
 void handlePacket(uint8_t *b, uint8_t target)
@@ -239,8 +237,10 @@ void handlePacket(uint8_t *b, uint8_t target)
           case CMD_PID_CONTROL_DEV_STOP:
             NRF_LOG_INFO("Stop transfer");
             // todo : issue stop transfer
-            if(actCtrl)
+            if(actCtrl){
               actCtrl(false,0);
+              moduleParam.state = 0;
+            }
             report_cmd_ok(header);
             break;
           case CMD_PID_CONTROL_DEV_START:
@@ -248,8 +248,11 @@ void handlePacket(uint8_t *b, uint8_t target)
             // todo : issue start transfer
             pktBuf.r = packet;
             pktBuf.w = packet + CMD_STRUCT_SZ;
-            if(actCtrl)
-              actCtrl(true,scan_interval/10);
+            if(actCtrl && (moduleParam.state == 0)){
+              actCtrl(true,moduleParam.scan_interval/10);
+              moduleParam.state = 1;
+              appParam.pid = 0;
+            }
             report_cmd_ok(header);
             break;
           default:
@@ -260,14 +263,14 @@ void handlePacket(uint8_t *b, uint8_t target)
           switch(cmd){
           case CMD_PID_SETUP_DEV_SCAN_INTERVAL:
             if(header->len == 10){
-              scan_interval = (b[8]) | (b[9]<<8);
+              moduleParam.scan_interval = (b[8]) | (b[9]<<8);
               report_cmd_ok(header);
             }
             else if(header->len == 8){
               uint8_t b[10];
               uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
-              b[9] = scan_interval & 0xff;
-              b[10] = (scan_interval >> 8) & 0xff;
+              b[8] = moduleParam.scan_interval & 0xff;
+              b[9] = (moduleParam.scan_interval >> 8) & 0xff;
               uint16_t len = buildPacket(type,header->pid,NULL,2,b);
               ble_nus_string_send(&m_nus,b,&len);
             }
@@ -279,9 +282,9 @@ void handlePacket(uint8_t *b, uint8_t target)
             if(header->len == 8){
               uint8_t b[11];
               uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
-              b[9] = moduleParam.adc_gain_code;
-              b[10] = moduleParam.adc_filter_code & 0xff;
-              b[11] = (moduleParam.adc_filter_code >> 8) & 0xff;
+              b[8] = moduleParam.adc_gain_code;
+              b[9] = moduleParam.adc_filter_code & 0xff;
+              b[10] = (moduleParam.adc_filter_code >> 8) & 0xff;
               uint16_t len = buildPacket(type,header->pid,NULL,3,b);
               ble_nus_string_send(&m_nus,b,&len);
             }else{
@@ -295,14 +298,13 @@ void handlePacket(uint8_t *b, uint8_t target)
               }              
             }
             break;
-          }
           case CMD_PID_SETUP_DEV_IMU:
             if(header->len == 8){
               uint8_t b[11];
               uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
-              b[9] = moduleParam.imu_rate_code;
-              b[10] = moduleParam.imu_acc_range;
-              b[11] = moduleParam.imu_gyro_range;
+              b[8] = moduleParam.imu_rate_code;
+              b[9] = moduleParam.imu_acc_range;
+              b[10] = moduleParam.imu_gyro_range;
               uint16_t len = buildPacket(type,header->pid,NULL,3,b);
               ble_nus_string_send(&m_nus,b,&len);
             }else{
@@ -311,6 +313,32 @@ void handlePacket(uint8_t *b, uint8_t target)
               moduleParam.imu_rate_code = b[10];
             }
             break;
+          case CMD_PID_SETUP_SYSTEM:
+            if(header->len == 9){
+              if(b[8] == 0x02){
+                memcpy(&b[9],moduleParam.appName,16);
+                uint16_t len = buildPacket(header->type & 0xf,header->pid,NULL,16,b);
+                ble_nus_string_send(&m_nus,b,&len);
+              }
+              else{
+                report_cmd_ng(header);
+              }
+            }
+            else{
+              if(b[8] == 0x02){
+                memcpy(moduleParam.appName,&b[9],header->len-9);
+                report_cmd_ok(header);
+              }
+              else{
+                report_cmd_ng(header);
+              }
+            }
+            break;
+          case CMD_PID_SETUP_CFG_SAVE:
+            NRF_LOG_INFO("Save parameters");
+            sysparam_update();
+            break;
+          }
         }break;
       }
   }else{
@@ -344,15 +372,15 @@ int app_ble_nus_init(actionControl f)
     err_code = ble_nus_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
 
-
+  return 0;
 }
 
-void app_ble_nus_start()
-{
-    uint32_t err_code;
-    err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
-    APP_ERROR_CHECK(err_code);
-}
+//void app_ble_nus_start()
+//{
+//    uint32_t err_code;
+//    err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+//    APP_ERROR_CHECK(err_code);
+//}
 
 
 /**

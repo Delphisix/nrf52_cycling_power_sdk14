@@ -10,6 +10,7 @@
 #include "sdk_config.h"
 #include "gd17003.h"
 #include "peripheral_if.h"
+#include "sysparams.h"
 
 int8_t ad7124_spi_read(uint8_t reg_adr, uint8_t *b, uint16_t n);
 int8_t ad7124_spi_write(uint8_t reg_adr, uint8_t *b, uint16_t n);
@@ -117,19 +118,9 @@ ad7124_dev_t ad7124 = {
 };
 
 
-int8_t ad7124cmd_init(void)
+int8_t ad7124cmd_init(adc_callback f, int32_t* b)
 {
-  memcpy((uint8_t*)ad7124.config->channels,(uint8_t*)channels,sizeof(ad7124_channel_t)*16);
-  memcpy((uint8_t*)ad7124.config->setups,(uint8_t*)setups,sizeof(ad7124_setup_t)*8);
-  memcpy((uint8_t*)ad7124.config->filters,(uint8_t*)filters,sizeof(ad7124_filter_t)*8);
-  memcpy((uint8_t*)ad7124.config->iDrv,(uint8_t*)ad7124_iDrv,sizeof(current_drive_t)*2);
-  ad7124.config->psw = 0;
-  ad7124.config->vBiasMask = 0x0;
-  
-  for(uint8_t i=0;i<8;i++){
-    //if(ad7124.config->channels[i].u.
-  }
-  
+    
   nrf_drv_spi_config_t spiad7124_config = NRF_DRV_SPI_DEFAULT_CONFIG;
   spiad7124_config.ss_pin = NRF_DRV_SPI_PIN_NOT_USED;
   spiad7124_config.miso_pin = AD7124_MISO_PIN;
@@ -148,13 +139,35 @@ int8_t ad7124cmd_init(void)
   in_cfg_ad7124.pull = NRF_GPIO_PIN_PULLUP;
   APP_ERROR_CHECK(nrf_drv_gpiote_in_init(AD7124_MISO_PIN,&in_cfg_ad7124,ad7124_int_isr));
   
+
+  ad7124_cmd_config();
+  buffer = b;
+  f_cb = f;  
+  
+}
+
+int8_t ad7124_cmd_config()
+{
+
+  memcpy((uint8_t*)ad7124.config->channels,(uint8_t*)channels,sizeof(ad7124_channel_t)*16);
+  memcpy((uint8_t*)ad7124.config->setups,(uint8_t*)setups,sizeof(ad7124_setup_t)*8);
+  memcpy((uint8_t*)ad7124.config->filters,(uint8_t*)filters,sizeof(ad7124_filter_t)*8);
+  memcpy((uint8_t*)ad7124.config->iDrv,(uint8_t*)ad7124_iDrv,sizeof(current_drive_t)*2);
+
+  for(uint8_t i=0;i<8;i++){
+    ad7124.config->filters[i].u.fs = moduleParam.adc_filter_code;
+    ad7124.config->setups[i].u.pga = moduleParam.adc_gain_code;
+  }
+  ad7124.config->psw = 0;
+  ad7124.config->vBiasMask = 0x0;
+
   ad7124.control.u.power_mode = 2;
   ad7124.config->iDrv[0].iout = ADC_IOUT_500UA;
   ad7124.config->iDrv[0].idrv_pin = 0;
+
+  ad7124_init(&ad7124);  
   
-  
-  ad7124_init(&ad7124);
-  
+
 }
 
 int8_t ad7124cmd_conversion()
@@ -168,13 +181,8 @@ int8_t ad7124cmd_conversion()
   ad7124_setmode(AD7124_MODE_CONTINUE,&ad7124);  
 }
 
-int8_t ad7124cmd_startConversion(adc_callback f, int32_t* b)
+int8_t ad7124cmd_startConversion(void)
 {
-  if(!f) return -1;
-  if(!b) return -2; 
-  
-  buffer = b;
-  f_cb = f;
   
   for(uint8_t i=0;i<8;i++){
     ad7124.config->channels[i].u.enable = ADC_BIT_DISABLE;

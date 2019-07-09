@@ -17,7 +17,7 @@ int8_t bmi160_read(uint8_t dev_adr, uint8_t reg_adr, uint8_t *b, uint16_t n);
 int8_t bmi160_write(uint8_t dev_adr, uint8_t reg_adr, uint8_t *b, uint16_t n);
 void bmi160_delay(uint32_t period);
 
-int8_t bmi160_cmd_init(void);
+int8_t bmi160_cmd_init(bmi_callback f, uint8_t *buf);
 void bmi160_cmd_acquire_one(struct bmi160_dev *dev, uint8_t *ptr);
 void bmi160_cmd_testRead(struct bmi160_dev *dev);
 int8_t bmi160_cmd_startfoc(struct bmi160_dev *dev);
@@ -33,6 +33,6 @@ void bmi160_cmd_start(bool intEn);
 void bmi160_cmd_stop(void);
 void bmi160_cmd_set_odr(uint8_t odr);
 int8_t bmi160_cmd_singleshot(uint8_t *ptr);
-int8_t bmi160_cms_startConv(bmi_callback f, uint8_t *buf);
-
+int8_t bmi160_cms_startConv(void);
+int8_t bmi160_cmd_start_anymotion(void);
 #endif

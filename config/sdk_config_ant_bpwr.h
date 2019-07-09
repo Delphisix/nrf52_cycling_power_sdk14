@@ -1089,7 +1089,7 @@
 // <4=> Debug 
 
 #ifndef NRF_LOG_DEFAULT_LEVEL
-#define NRF_LOG_DEFAULT_LEVEL 3
+#define NRF_LOG_DEFAULT_LEVEL 4
 #endif
 
 // <q> NRF_LOG_DEFERRED  - Enable deffered logger.
@@ -2898,7 +2898,7 @@
 // <e> NRF_SDH_BLE_LOG_ENABLED - Enable logging in SoftDevice handler (BLE) module.
 //==========================================================
 #ifndef NRF_SDH_BLE_LOG_ENABLED
-#define NRF_SDH_BLE_LOG_ENABLED 0
+#define NRF_SDH_BLE_LOG_ENABLED 1
 #endif
 // <o> NRF_SDH_BLE_LOG_LEVEL  - Default Severity level
  
@@ -2909,7 +2909,7 @@
 // <4=> Debug 
 
 #ifndef NRF_SDH_BLE_LOG_LEVEL
-#define NRF_SDH_BLE_LOG_LEVEL 3
+#define NRF_SDH_BLE_LOG_LEVEL 4
 #endif
 
 // <o> NRF_SDH_BLE_INFO_COLOR  - ANSI escape code prefix.
@@ -2960,7 +2960,7 @@
 // <4=> Debug 
 
 #ifndef NRF_SDH_LOG_LEVEL
-#define NRF_SDH_LOG_LEVEL 3
+#define NRF_SDH_LOG_LEVEL 4
 #endif
 
 // <o> NRF_SDH_INFO_COLOR  - ANSI escape code prefix.
@@ -3000,7 +3000,7 @@
 // <e> NRF_SDH_SOC_LOG_ENABLED - Enable logging in SoftDevice handler (SoC) module.
 //==========================================================
 #ifndef NRF_SDH_SOC_LOG_ENABLED
-#define NRF_SDH_SOC_LOG_ENABLED 0
+#define NRF_SDH_SOC_LOG_ENABLED 1
 #endif
 // <o> NRF_SDH_SOC_LOG_LEVEL  - Default Severity level
  
@@ -3011,7 +3011,7 @@
 // <4=> Debug 
 
 #ifndef NRF_SDH_SOC_LOG_LEVEL
-#define NRF_SDH_SOC_LOG_LEVEL 3
+#define NRF_SDH_SOC_LOG_LEVEL 4
 #endif
 
 // <o> NRF_SDH_SOC_INFO_COLOR  - ANSI escape code prefix.

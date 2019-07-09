@@ -37,20 +37,21 @@ typedef struct{
   double cycleTorq;
 }torque_data_t;
 
-typedef struct{
-  sysstate_t state;
-  torque_data_t torque;
-  uint16_t power;
-  int32_t rpm;
-  double dTorque;
-  double staticTorque;
-  uint8_t actChannel;
-  bool goStop;
-}appParam_t;
+//typedef struct{
+//  sysstate_t state;
+//  torque_data_t torque;
+//  uint16_t power;
+//  int32_t rpm;
+//  double dTorque;
+//  double staticTorque;
+//  uint8_t actChannel;
+//  bool goStop;
+//}appParam_t;
 
 
 extern sysParam_t sysParam;
-extern appParam_t appParam;
+
+//extern appParam_t appParam;
 
 void peripheral_init(void);
 void peripheral_deinit(void);
