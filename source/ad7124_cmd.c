@@ -126,7 +126,7 @@ int8_t ad7124cmd_init(adc_callback f, int32_t* b)
   spiad7124_config.miso_pin = AD7124_MISO_PIN;
   spiad7124_config.mosi_pin = AD7124_MOSI_PIN;
   spiad7124_config.sck_pin = AD7124_SCK_PIN;
-  spiad7124_config.frequency = NRF_DRV_SPI_FREQ_1M;
+  spiad7124_config.frequency = NRF_DRV_SPI_FREQ_8M;
   spiad7124_config.mode = NRF_DRV_SPI_MODE_3;
   APP_ERROR_CHECK(nrf_drv_spi_init(&ad7124_spi, &spiad7124_config, NULL, NULL));
   

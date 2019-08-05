@@ -49,9 +49,12 @@ typedef struct{
 }_accum_torque_t;
 
 typedef struct{
-  bool isMax,isMin;
+  bool isPos,isNeg;
   float val;
   float time;
+  float history[8];
+  uint8_t count;
+  float sampleIntervalMs;
 }_accum_imu_t;
 
 
@@ -80,10 +83,12 @@ typedef struct{
   int8_t *bmi_ptr;
   uint16_t period;
   uint16_t period_cnt;
+  float period_ms;
   uint8_t validPeriod;
   uint8_t idleCount;
   uint8_t pid;
   _accum_imu_t imu;
+  uint8_t opmode;
 }app_param_t;
   
 extern module_param_t moduleParam;

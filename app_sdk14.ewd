@@ -804,7 +804,7 @@
         <option>
           <name>CCUSBDevice</name>
           <version>1</version>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>CCRDICatchReset</name>

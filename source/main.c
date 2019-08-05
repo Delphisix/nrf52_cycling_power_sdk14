@@ -130,6 +130,7 @@
 #include "sensorData.h"
 #include "ble_sensor_node.h"
 
+#include "packetvalid.h"
 
 
 #define MODIFICATION_TYPE_BUTTON 0 /* predefined value, MUST REMAIN UNCHANGED */
@@ -176,7 +177,7 @@ app_gpiote_user_id_t m_app_gpiote_my_id;
 app_gpiote_user_id_t  id_ad7124;
 app_gpiote_user_id_t  id_adxl335;
 uint32_t adc_buffer[2];
-uint8_t bmi_buffer[12];
+static uint8_t bmi_buffer[12];
 void adc_drdy(void);
 void bmi_drdy(void);
 
@@ -272,12 +273,12 @@ static void inertial_timeout_handler(void * p_context)
 
 void handler_report_evt(bool act,uint16_t interval)
 {
-  NRF_LOG_INFO("Report interval:%d, ticks=",interval,APP_TIMER_TICKS(interval));
+  NRF_LOG_INFO("Report interval:%d",interval);
   uint32_t err_code;
   if(act){
-//    ad7124_cmd_config();    
-//    ad7124cmd_startConversion();
-//    bmi160_cms_startConv();    
+    ad7124_cmd_config();  
+    ad7124cmd_startConversion();    
+    bmi160_cms_startConv();
     if(interval >= 5){
       err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(interval),NULL);
     }
@@ -286,8 +287,8 @@ void handler_report_evt(bool act,uint16_t interval)
     APP_ERROR_CHECK(err_code);
   }
   else{
-//    ad7124cmd_goStop();
-//    bmi160_cmd_stop();
+    ad7124cmd_goStop();
+    bmi160_cmd_stop();
     err_code = app_timer_stop(m_report_timer_id);
     APP_ERROR_CHECK(err_code);
   }
@@ -298,8 +299,12 @@ void report_timeout_handler(void *p_context)
   //NRF_LOG_INFO(__func__);
   uint8_t buf[20];
   memcpy(&buf[0],adc_buffer,8);
-  memcpy(&buf[8],bmi_buffer,12);
-  app_ble_nus_feed_data(buf,20);
+  if(appParam.opmode == CMD_PID_CONTROL_DEV_START){
+    memcpy(&buf[8],bmi_buffer,12);
+    app_ble_nus_feed_data(buf,20);
+  }else if(appParam.opmode == CMD_PID_CONTROL_DEV_START_ADC){
+    app_ble_nus_feed_data(buf,8);
+  }
 }
 //void report_timeout_handler(void *p_context)
 //{
@@ -400,8 +405,10 @@ static void advertising_init(void)
     m_data.data.p_data = data;
     m_data.data.size = sizeof(data);
     
+    //int8_t tx_power = 4;
     //init.advdata.p_manuf_specific_data = &m_data;
 
+    //init.advdata.p_tx_power_level = &tx_power;
     init.advdata.name_type          = BLE_ADVDATA_FULL_NAME;
     init.advdata.include_appearance = false;
 //    init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
@@ -477,6 +484,9 @@ static void gap_params_init(void)
     gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
 
     err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
+    APP_ERROR_CHECK(err_code);
+    
+    err_code = sd_ble_gap_tx_power_set(4);    
     APP_ERROR_CHECK(err_code);
 }
 
@@ -631,7 +641,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             set_conn_handle(m_conn_handle);
             appParam.state = ST_DISCONNECTED;
-//            (false);
+            advertising_start(false);
             break;
 
 #if defined(S132)
@@ -1143,18 +1153,20 @@ uint16_t adc_cntr = 0;
 void adc_drdy(void)
 {
   adc_cntr++;
-  sensorDataFeedADC(0,adc_buffer[0]>>8);
+  if(appParam.opmode == 0)
+    sensorDataFeedADC(0,adc_buffer[0]>>8);
 }
 
 void bmi_drdy(void)
 {
-  //NRF_LOG_INFO("BMI Interrupt");
+  //NRF_LOG_INFO(__func__);
   if(appParam.state == ST_IDLE){
     //NRF_LOG_INFO("Start adv");
 //    advertising_start(false);
   }
   //todo: feed IMU data to filter and fusion
-  sensorDataFeedIMU(bmi_buffer);
+  if(appParam.opmode == 0)
+    sensorDataFeedIMU(bmi_buffer);
 }
 
 #define USE_SD   0
@@ -1181,20 +1193,19 @@ int main(void)
 
   //app_adc_init();
   //peer_manage_init();
-  bmi160_cmd_init(bmi_drdy,bmi_buffer);
-  ad7124cmd_init(adc_drdy, adc_buffer);
+  //nrf_delay_ms(200);
   uint16_t rate = 25*(1 << (moduleParam.imu_rate_code-0x6));
   sensorDataInit(rate);
   appParam.adc_ptr = adc_buffer;
   appParam.bmi_ptr = bmi_buffer;
 
+  bmi160_cmd_init(bmi_drdy,bmi_buffer);
+  ad7124cmd_init(adc_drdy, adc_buffer);
   ant_bpwr_init();
   
-  
-
   NRF_LOG_INFO("Application started\n");
-  ad7124cmd_startConversion();
-  bmi160_cms_startConv();
+//  ad7124cmd_startConversion();
+//  bmi160_cms_startConv();
 
 //  bmi160_cmd_start_anymotion();
   application_timers_start();

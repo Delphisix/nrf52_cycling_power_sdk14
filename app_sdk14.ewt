@@ -2140,6 +2140,9 @@
     </group>
     <group>
       <name>ble_cycling</name>
+      <file>
+        <name>$PROJ_DIR$\source\sensorData.c</name>
+      </file>
     </group>
     <group>
       <name>ble_uart</name>
@@ -2212,6 +2215,9 @@
       <file>
         <name>$PROJ_DIR$\source\kalMan.c</name>
       </file>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\MahonyAHRS.c</name>
+      </file>
     </group>
     <group>
       <name>ota</name>
@@ -2231,6 +2237,24 @@
         <name>$extsource$\haoyi_lib\communication\packetValid.c</name>
       </file>
     </group>
+    <group>
+      <name>SignalProcess</name>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\recursive.c</name>
+      </file>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\time_domain.c</name>
+      </file>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\time_domain.h</name>
+      </file>
+    </group>
+    <file>
+      <name>$extsource$\haoyi_lib\ble_services\ble_sensor_node.c</name>
+    </file>
+    <file>
+      <name>$extsource$\haoyi_lib\ble_services\ble_sensor_node.h</name>
+    </file>
     <file>
       <name>$PROJ_DIR$\source\main.c</name>
     </file>
@@ -2408,6 +2432,12 @@
     <group>
       <name>services</name>
       <file>
+        <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ble\ble_services\ble_hrs\ble_hrs.c</name>
+      </file>
+      <file>
+        <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ble\ble_services\ble_hrs\ble_hrs.h</name>
+      </file>
+      <file>
         <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ble\ble_services\ble_nus\ble_nus.c</name>
       </file>
       <file>
@@ -2460,6 +2490,9 @@
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\gpiote\nrf_drv_gpiote.c</name>
     </file>
     <file>
+      <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\ppi\nrf_drv_ppi.c</name>
+    </file>
+    <file>
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\saadc\nrf_drv_saadc.c</name>
     </file>
     <file>
@@ -2470,6 +2503,9 @@
     </file>
     <file>
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\uart\nrf_drv_uart.c</name>
+    </file>
+    <file>
+      <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\hal\nrf_saadc.c</name>
     </file>
     <file>
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\spi_master\spi_5W_master.c</name>

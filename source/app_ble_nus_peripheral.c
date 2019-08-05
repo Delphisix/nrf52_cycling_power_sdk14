@@ -89,7 +89,11 @@ BLE_NUS_DEF(m_nus);                                                             
 //    {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
 //};
 
-
+#define PACKET_BUFFER_SIZE      BIN_PKT_SZ
+static uint8_t packet[BIN_PKT_SZ*2];
+static uint8_t packet2[BIN_PKT_SZ*2];
+buffer_t pktBuf={packet,packet,packet,packet2,0,0,0};
+void sendData();
 void app_buf_write_cb(uint8_t *b, uint16_t len)
 {
   
@@ -114,18 +118,20 @@ void nus_data_handler(ble_nus_evt_t * p_evt)
     {
         uint32_t err_code;
 
-        NRF_LOG_INFO("Received data from BLE NUS.");
-        NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+        //NRF_LOG_INFO("Received data from BLE NUS.");
+        //NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
         //actCtrl(true,scan_interval);
-        uint8_t str[]="12345";
-        uint16_t sz=5;
+        //uint8_t str[]="12345";
+        //uint16_t sz=5;
         //err_code = ble_nus_string_send(&m_nus,str,&sz);
         writePacketBuffer(p_evt->params.rx_data.p_data,p_evt->params.rx_data.length);
     }
     else if(p_evt->type == BLE_NUS_EVT_TX_RDY){
-      NRF_LOG_INFO("TX completed");
-          bsp_board_led_off(0);
-          txReady = true;
+      //NRF_LOG_INFO("TX completed");
+      bsp_board_led_off(0);
+      txReady = true;
+      //if(pktBuf.pendBuffer)
+       // sendData();
     }
 
 }
@@ -136,40 +142,29 @@ void nus_data_handler(ble_nus_evt_t * p_evt)
 // PACKET HANDLE CODE START
 //#define REPORT_INTERVAL APP_TIMER_TICKS(100)
 //APP_TIMER_DEF(m_report_timer_id);
-#define PACKET_BUFFER_SIZE      BIN_PKT_SZ
-static uint8_t packet[BIN_PKT_SZ*2];
-static uint8_t packet2[BIN_PKT_SZ*2];
-buffer_t pktBuf={packet,packet,packet,packet2,0,0,0};
 
-//void report_timeout_handler(void *p_context)
-//{
-//  NRF_LOG_INFO(__func__);
-//  pktBuf.w += bmi160_cmd_singleshot(pktBuf.w);
-//  if(BUF_SIZE(pktBuf) > 100){
-//    uint16_t len = BUF_SIZE(pktBuf);
-//    buildPacketHeader(MASK_TYPE_DATA,0x0,packet,len);
-//    // put into nus buffer
-//    ble_nus_string_send(&m_nus,packet,&len);
-//    pktBuf.r = packet;
-//    pktBuf.w = (packet + CMD_STRUCT_SZ);
-//    NRF_LOG_INFO("Send data %d bytes",len);
-//  }
-//}
-uint8_t vv;
-uint8_t buff[208];
-uint16_t szz = 208;
+//uint8_t vv;
+//uint8_t buff[208];
+//uint16_t szz = 208;
+void sendData()
+{
+  uint32_t err;
+  if(txReady && pktBuf.pendBuffer){
+    //NRF_LOG_INFO("Send size:%d",pktBuf.szToRead);
+    txReady = false;
+    pktBuf.pendBuffer--;
+    err = ble_nus_string_send(&m_nus,pktBuf.r,&pktBuf.szToRead);
+    bsp_board_led_on(0);
+    APP_ERROR_CHECK(err);
+  }else{
+    //NRF_LOG_INFO("Current pend buffer %d",pktBuf.pendBuffer);
+  }
+}
+
 void app_ble_nus_feed_data(uint8_t *p, uint8_t sz)
 {
   uint32_t err;
-//  if(sz == 0) return;
-//  if(txReady){
-//    err = ble_nus_string_send(&m_nus,buff,&szz);
-//    //NRF_LOG_INFO("send err:%d",err);
-//    txReady = false;
-//    bsp_board_led_on(0);
-//  }
-//    return;
-    memcpy(pktBuf.w, p, sz);
+  memcpy(pktBuf.w, p, sz);
   pktBuf.w += sz;
   pktBuf.szWritten += sz;
   if((pktBuf.szWritten+CMD_STRUCT_SZ) >= BIN_PKT_SZ){
@@ -182,17 +177,11 @@ void app_ble_nus_feed_data(uint8_t *p, uint8_t sz)
     pktBuf.szToRead = pktBuf.szWritten + CMD_STRUCT_SZ;
     //pktBuf.szToRead = BIN_PKT_SZ;
     pktBuf.szWritten = 0;
+    pktBuf.pendBuffer++;
     //memset(pktBuf.r,vv++,208);
-    if(txReady){
-      NRF_LOG_INFO("Send size:%d",pktBuf.szToRead);
-      txReady = false;
-      err = ble_nus_string_send(&m_nus,pktBuf.r,&pktBuf.szToRead);
-      bsp_board_led_on(0);
-//      NRF_LOG_INFO("Send result:%d",err);
-      APP_ERROR_CHECK(err);
-    }
-
   }
+  sendData();
+  
 }
 
 void set_conn_handle(uint16_t h)
@@ -231,6 +220,7 @@ void handlePacket(uint8_t *b, uint8_t target)
       NRF_LOG_INFO("Device Command");
       uint8_t cmd = header->pid & (~NOCRC_MASK);
       uint16_t arg;
+      appParam.opmode = cmd;
       switch(header->type){
         case MASK_TYPE | CMD_TYPE_CONTROL:{
           switch(cmd){
@@ -244,10 +234,12 @@ void handlePacket(uint8_t *b, uint8_t target)
             report_cmd_ok(header);
             break;
           case CMD_PID_CONTROL_DEV_START:
+          case CMD_PID_CONTROL_DEV_START_ADC:
             NRF_LOG_INFO("Start transfer");
             // todo : issue start transfer
             pktBuf.r = packet;
             pktBuf.w = packet + CMD_STRUCT_SZ;
+            pktBuf.pendBuffer = 0;
             if(actCtrl && (moduleParam.state == 0)){
               actCtrl(true,moduleParam.scan_interval/10);
               moduleParam.state = 1;
@@ -311,6 +303,7 @@ void handlePacket(uint8_t *b, uint8_t target)
               moduleParam.imu_acc_range = b[8];
               moduleParam.imu_gyro_range = b[9];
               moduleParam.imu_rate_code = b[10];
+              report_cmd_ok(header);
             }
             break;
           case CMD_PID_SETUP_SYSTEM:
@@ -336,6 +329,7 @@ void handlePacket(uint8_t *b, uint8_t target)
             break;
           case CMD_PID_SETUP_CFG_SAVE:
             NRF_LOG_INFO("Save parameters");
+            report_cmd_ok(header);
             sysparam_update();
             break;
           }

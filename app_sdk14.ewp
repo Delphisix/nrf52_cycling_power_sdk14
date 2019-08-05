@@ -465,6 +465,8 @@
           <state>D:\SourceRespo\haoyi_lib\inertial</state>
           <state>D:\SourceRespo\haoyi_lib\communication</state>
           <state>D:\SourceRespo\haoyi_lib\dfu</state>
+          <state>D:\SourceRespo\haoyi_lib\filter</state>
+          <state>D:\SourceRespo\haoyi_lib\ble_services</state>
           <state>D:\SourceRespo\BSXlite_Cortex_M3_M4_M4F\algo\algo_bsx\Inc</state>
         </option>
         <option>
@@ -1839,7 +1841,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>lnk0t.icf</state>
+          <state>$TOOLKIT_DIR$\CONFIG\generic_cortex.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
@@ -1899,7 +1901,7 @@
         </option>
         <option>
           <name>IlinkProgramEntryLabel</name>
-          <state></state>
+          <state>__iar_program_start</state>
         </option>
         <option>
           <name>DoFill</name>
@@ -2121,6 +2123,9 @@
     </group>
     <group>
       <name>ble_cycling</name>
+      <file>
+        <name>$PROJ_DIR$\source\sensorData.c</name>
+      </file>
     </group>
     <group>
       <name>ble_uart</name>
@@ -2138,6 +2143,7 @@
       <name>Bootloader</name>
       <excluded>
         <configuration>Debug</configuration>
+        <configuration>Release</configuration>
       </excluded>
       <file>
         <name>$PROJ_DIR$\source\bootloader\antfs_ota.c</name>
@@ -2193,6 +2199,9 @@
     </group>
     <group>
       <name>Fusion</name>
+      <excluded>
+        <configuration>Release</configuration>
+      </excluded>
       <file>
         <name>$PROJ_DIR$\source\fusion_bosch.c</name>
         <excluded>
@@ -2201,6 +2210,12 @@
       </file>
       <file>
         <name>$PROJ_DIR$\source\kalMan.c</name>
+        <excluded>
+          <configuration>Debug</configuration>
+        </excluded>
+      </file>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\MahonyAHRS.c</name>
       </file>
     </group>
     <group>
@@ -2227,6 +2242,28 @@
         <name>$extsource$\haoyi_lib\communication\packetValid.c</name>
       </file>
     </group>
+    <group>
+      <name>SignalProcess</name>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\recursive.c</name>
+      </file>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\time_domain.c</name>
+      </file>
+      <file>
+        <name>$extsource$\haoyi_lib\Filter\time_domain.h</name>
+      </file>
+    </group>
+    <file>
+      <name>$extsource$\haoyi_lib\ble_services\ble_sensor_node.c</name>
+      <excluded>
+        <configuration>Debug</configuration>
+        <configuration>Release</configuration>
+      </excluded>
+    </file>
+    <file>
+      <name>$extsource$\haoyi_lib\ble_services\ble_sensor_node.h</name>
+    </file>
     <file>
       <name>$PROJ_DIR$\source\main.c</name>
     </file>
@@ -2275,6 +2312,9 @@
   </group>
   <group>
     <name>nRF_ANT</name>
+    <excluded>
+      <configuration>Release</configuration>
+    </excluded>
     <group>
       <name>profiles</name>
       <group>
@@ -2404,6 +2444,12 @@
     <group>
       <name>services</name>
       <file>
+        <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ble\ble_services\ble_hrs\ble_hrs.c</name>
+      </file>
+      <file>
+        <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ble\ble_services\ble_hrs\ble_hrs.h</name>
+      </file>
+      <file>
         <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ble\ble_services\ble_nus\ble_nus.c</name>
       </file>
       <file>
@@ -2456,6 +2502,9 @@
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\gpiote\nrf_drv_gpiote.c</name>
     </file>
     <file>
+      <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\ppi\nrf_drv_ppi.c</name>
+    </file>
+    <file>
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\saadc\nrf_drv_saadc.c</name>
     </file>
     <file>
@@ -2466,6 +2515,9 @@
     </file>
     <file>
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\uart\nrf_drv_uart.c</name>
+    </file>
+    <file>
+      <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\hal\nrf_saadc.c</name>
     </file>
     <file>
       <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\drivers_nrf\spi_master\spi_5W_master.c</name>

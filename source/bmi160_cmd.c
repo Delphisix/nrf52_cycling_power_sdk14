@@ -13,12 +13,14 @@
 #include "bmi160_cmd.h"
 #include "sysparams.h"
 
+#include "nrf_log.h"
+
 
 #define AR(x,y,z) ((x <=y) && (y <= z))
 static const nrf_drv_spi_t bmi_spi = NRF_DRV_SPI_INSTANCE(1);
 
 static bmi_callback f_cb;
-uint8_t *f_buf;
+static uint8_t *f_buf;
 
 // bmi160
 static struct bmi160_dev bmi160 = {
@@ -203,7 +205,8 @@ int8_t bmi160_cmd_pwup(struct bmi160_dev *dev)
   dev->accel_cfg.odr = moduleParam.imu_rate_code;
   //dev->accel_cfg.odr = 0xa;
   dev->accel_cfg.range = moduleParam.imu_acc_range;
-  dev->accel_cfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
+//  dev->accel_cfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
+  dev->accel_cfg.bw = BMI160_ACCEL_BW_OSR4_AVG1;
 //  
   dev->gyro_cfg.power = BMI160_GYRO_NORMAL_MODE;
   dev->gyro_cfg.odr = moduleParam.imu_rate_code;
@@ -214,6 +217,7 @@ int8_t bmi160_cmd_pwup(struct bmi160_dev *dev)
 }
 int8_t bmi160_cmd_init(bmi_callback f, uint8_t *buf)
 {
+  //NRF_LOG_INFO("%s buffer=%d",__func__,buf);
   int8_t rslt = BMI160_OK;
   
     // spim1
@@ -222,7 +226,7 @@ int8_t bmi160_cmd_init(bmi_callback f, uint8_t *buf)
   spibmi160_config.miso_pin = BMI160_MISO_PIN;
   spibmi160_config.mosi_pin = BMI160_MOSI_PIN;
   spibmi160_config.sck_pin = BMI160_SCK_PIN;
-  spibmi160_config.frequency = NRF_DRV_SPI_FREQ_1M;
+  spibmi160_config.frequency = NRF_DRV_SPI_FREQ_8M;
   spibmi160_config.mode = NRF_DRV_SPI_MODE_3;
   APP_ERROR_CHECK(nrf_drv_spi_init(&bmi_spi, &spibmi160_config, NULL, NULL));
   
@@ -250,8 +254,11 @@ int8_t bmi160_cmd_init(bmi_callback f, uint8_t *buf)
   bmi160.write = bmi160_write;
   bmi160.delay_ms = bmi160_delay;
   
+  //nrf_delay_ms(50);
+  
   rslt = bmi160_init(dev);
   if(rslt != BMI160_OK){
+    NRF_LOG_INFO("BMI160 Init Fail %x",rslt);
     return rslt;
   }
   
@@ -269,12 +276,13 @@ int8_t bmi160_cmd_init(bmi_callback f, uint8_t *buf)
   //rslt = bmi160_set_offsets(&foc_config,&moduleParam.bmi160.offsets,dev);
   //bmi160_cmd_config_int(cfg);
   bmi160_cmd_testRead(dev);
-  
-//  fusion_init();
-  
+
   f_cb = f;
   f_buf = buf;
   
+  //NRF_LOG_INFO("%s buffer=%d",__func__,f_buf);
+  
+  nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);  
   return rslt;
 }
 
@@ -306,14 +314,22 @@ int8_t bmi160_write(uint8_t dev_adr, uint8_t reg_adr, uint8_t *b, uint16_t n)
 
 void bmi160_delay(uint32_t period)
 {
-    nrf_delay_ms(period);
+    nrf_delay_us(period*500);
+//    nrf_delay_ms(period);
 }
 
 void bmi160_int_isr(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {
   if(f_buf){
+    NRF_LOG_INFO("%s with Buffer=%d",__func__,f_buf);
     bmi160_get_regs(BMI160_GYRO_DATA_ADDR, f_buf, 12, &bmi160);
+    bool az = true;
+    for(uint8_t i=0;i<12;i++)
+      if(f_buf[i] != 0x0) az = false;
+    if(az) NRF_LOG_INFO("%s, BUFFER ZERO",__func__);
     if(f_cb) f_cb();
+  }else{
+    NRF_LOG_INFO("%s No Buffer=%d",__func__,f_buf);
   }
 
 }
@@ -339,10 +355,13 @@ int8_t bmi160_cms_startConv(void)
 //  if(!buf) return -1; 
 //   f_cb = f;
 //  f_buf = buf;
-  bmi160_cmd_pwup(&bmi160);
   bmi160_cmd_config_int_am(&bmi160,0);
   bmi160_cmd_config_int(&bmi160,1);
-  nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
+  //nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
+  bmi160_cmd_pwup(&bmi160);
+  
+  NRF_LOG_INFO("BMI160:odr=%d",bmi160.accel_cfg.odr);
+
 
   return 0;
 }
@@ -353,12 +372,13 @@ int8_t bmi160_cmd_start_anymotion(void)
   bmi160_cmd_config_int(&bmi160,0); 
   bmi160_cmd_config_int_am(&bmi160,1);
   //bmi160_cmd_pwdn(&bmi160);
-  nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
+  //nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
 }
 
 void bmi160_cmd_stop(void)
 {
-  nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,false);
+//  nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,false);
+//  nrf_drv_gpiote_in_event_disable(BMI160_INT1_PIN);
   bmi160_cmd_config_int(&bmi160,0); 
   bmi160_cmd_config_int_am(&bmi160,0);
   bmi160_cmd_pwdn(&bmi160);

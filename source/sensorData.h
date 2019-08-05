@@ -19,7 +19,7 @@ typedef struct{
   _vibration_object_t x,y,z;
 }vibrationData_t;
 
-typedef void (*fusion_func)(float,float,float,float,float,float);
+typedef void (*fusion_func)(float,float,float,float,float,float,float);
 
 
 #define VIBRATION_DEF(_name,samples) \

@@ -108,74 +108,133 @@ void sensorDataFeedIMU(uint8_t *b)
   newVal.ay = (float)(d->ay - imu_ay.offset)*imu_ay.scale;
   newVal.az = (float)(d->az - imu_az.offset)*imu_az.scale;
   
-  if(imu_gx.f)
-    imu_gx.f(&imu_gx.filter,newVal.gx);
-  if(imu_gy.f)
-    imu_gy.f(&imu_gy.filter,newVal.gy);
-  if(imu_gz.f)
-    imu_gz.f(&imu_gz.filter,newVal.gz);
-  if(imu_ax.f)
-    imu_ax.f(&imu_ax.filter,newVal.ax);
-  if(imu_ay.f)
-    imu_ay.f(&imu_ay.filter,newVal.ay);
-  if(imu_az.f)
-    imu_az.f(&imu_az.filter,newVal.az);
+//  if(imu_gx.f)
+//    imu_gx.f(&imu_gx.filter,newVal.gx);
+//  if(imu_gy.f)
+//    imu_gy.f(&imu_gy.filter,newVal.gy);
+//  if(imu_gz.f)
+//    imu_gz.f(&imu_gz.filter,newVal.gz);
+//  if(imu_ax.f)
+//    imu_ax.f(&imu_ax.filter,newVal.ax);
+//  if(imu_ay.f)
+//    imu_ay.f(&imu_ay.filter,newVal.ay);
+//  if(imu_az.f)
+//    imu_az.f(&imu_az.filter,newVal.az);
   
   if(imu_fusion){
     appParam.sampleTime += appParam.imt_sample_interval;
     //appParam.period_cnt++;
 
-    imu_fusion(imu_gx.filter.y[0],imu_gy.filter.y[0],imu_gz.filter.y[0],imu_ax.filter.y[0],imu_ay.filter.y[0],imu_az.filter.y[0]);
+//    imu_fusion(imu_gx.filter.y[0],imu_gy.filter.y[0],imu_gz.filter.y[0],imu_ax.filter.y[0],imu_ay.filter.y[0],imu_az.filter.y[0],appParam.imu.sampleIntervalMs);
+//    imu_fusion(0,0,0,imu_ax.filter.y[0],imu_ay.filter.y[0],imu_az.filter.y[0],appParam.imu.sampleIntervalMs);
+    //imu_fusion(0,0,0,newVal.ax,newVal.ay,newVal.az,appParam.imu.sampleIntervalMs);
     
-    appParam.imu.time += appParam.imt_sample_interval;
-    if(imu_ax.filter.y[0] > 0.1){
-      if(appParam.imu.isMax){
-        if(imu_ax.filter.y[0] > appParam.imu.val){
-          appParam.imu.val = imu_ax.filter.y[0];
-        }else{ // max found
-          appParam.imu.isMax = false;
-          appParam.imu.isMin = true;
-          if(appParam.imu.time > 240){
-            appParam.period = lround(appParam.imu.time * 2.048);
-            appParam.rpm = 60000/appParam.imu.time;
+    appParam.imu.time += appParam.imu.sampleIntervalMs;
+    
+    //if(appParam.imu.time >= 0.1){
+      //float gx = 2*(q1*q3 - q0*q2);
+      //float gy = 2*(q0*q1 + q2*q3);
+      //float gz = q0*q0 - q1*q1 - q2*q2 + q3*q3;
+      
+      //if(gx > 1) gx = 1;
+      //if(gx < -1) gx = -1;
+      if(newVal.ax > 1) newVal.ax = 1;
+      if(newVal.ax < -1) newVal.ax = -1;
+      if(appParam.imu.count < 8){
+        appParam.imu.history[appParam.imu.count] = -asinf(newVal.ax) ;
+        appParam.imu.count++;
+        appParam.period_ms=3.1;
+      }
+      else{
+        bool pos = true;
+        bool neg = true;
+        for(int8_t i=0;i<7;i++){
+          if(appParam.imu.history[i] < 0 )
+            pos = false;
+          if(appParam.imu.history[i] > 0 )
+            neg = false;
+          appParam.imu.history[i] = appParam.imu.history[i+1];
+        }
+        
+        if(appParam.imu.isPos){
+          if(!pos){
+            appParam.period_ms = appParam.imu.time;
+            appParam.imu.time = 0;      
           }
+        }
+        appParam.imu.isPos = pos;
+        appParam.imu.history[7] = -asin(newVal.ax);
+        
+        if((appParam.imu.time - appParam.period_ms) > 0.1){
+          appParam.period_ms = appParam.imu.time;
+        
+        if(appParam.period_ms > 3){
+          appParam.period = 0;
+          appParam.rpm = 0;
+        }
+        else if(appParam.period_ms < 0.25){
+          appParam.period = 0;
+          appParam.rpm = 0;
+        }
+        else{
+          appParam.period += lround(appParam.period_ms * 1024);
+          appParam.rpm = 60/appParam.period_ms/2;
           appParam.imu.time = 0;
         }
-      }else{
-        appParam.imu.isMax = true; // set to find max
-        appParam.imu.val = imu_ax.filter.y[0];
-      }
-    }
-    else if(imu_ax.filter.y[0] < 0.1){
-      if(appParam.imu.isMin){
-        if(imu_ax.filter.y[0] < appParam.imu.val){
-          appParam.imu.val = imu_ax.filter.y[0];          
-        }else{
-          appParam.imu.isMax = true;
-          appParam.imu.isMin = false;
         }
-      }else{
-        appParam.imu.isMin = true;
-        appParam.imu.val = imu_ax.filter.y[0];          
       }
-    }
-//    if(appParam.sampleTime == 100){
-//      // update value to normalized one
-//      float ax = 2*(q1*q3 - q0*q2);
-//      //float ax = 2*(q1*q3-q0*q2)(1-2*(q1*q1+q2*q2));
-//      if(ax > 1) ax = 1;
-//      if(ax < -1) ax = -1;
-//      appParam.pitch = -asinf(ax);
-//      appParam.dTorque = appParam.pitch_prev - appParam.pitch;
-//      appParam.pitch_prev = appParam.pitch;
-//      ax = 60.*appParam.dTorque*10./6.28;
-//      if(ax < 0) ax = 0;
-//      if(ax < 300){
-//        m_rpm.f(&m_rpm.filter,ax<5?0:ax);
-//        appParam.rpm = m_rpm.filter.y[0]>10?m_rpm.filter.y[0]:0;
-//        appParam.period = lround(60./appParam.rpm)<<11;
+    //}
+    
+//    float bb = 0;
+//    bool max_found = false;
+//    
+//    if(imu_ax.filter.y[0] > 0.1){
+//      if(appParam.imu.isMax){
+//        if(imu_ax.filter.y[0] > appParam.imu.val){
+//          appParam.imu.val = imu_ax.filter.y[0];
+//        }else{ // max found
+//          appParam.imu.isMax = false;
+//          appParam.imu.isMin = true;
+//          max_found = true;
+//        }
+//      }else{
+//        appParam.imu.isMax = true; // set to find max
+//        appParam.imu.val = imu_ax.filter.y[0];
 //      }
-//      appParam.sampleTime = 0;
+//    }
+//    else if(imu_ax.filter.y[0] < 0.1){
+//      if(appParam.imu.isMin){
+//        if(imu_ax.filter.y[0] < appParam.imu.val){
+//          appParam.imu.val = imu_ax.filter.y[0];          
+//        }else{
+//          appParam.imu.isMax = true;
+//          appParam.imu.isMin = false;
+//        }
+//      }else{
+//        appParam.imu.isMin = true;
+//        appParam.imu.val = imu_ax.filter.y[0];          
+//      }
+//    }
+//    
+//    if(max_found){
+//      if(appParam.imu.time > 240){
+//        appParam.period_ms = appParam.imu.time;
+//        appParam.period = lround(appParam.period_ms * 2.048);
+//        appParam.rpm = 60000/appParam.period_ms;
+//        appParam.imu.time = 0;
+//      }
+//    }
+//    else if((appParam.imu.time - appParam.period_ms) > 100){
+//      appParam.period_ms = appParam.imu.time;
+//      if(appParam.period_ms > 3000){
+//        appParam.period = 0;
+//        appParam.rpm = 0;
+//      }
+//      else{
+//        appParam.period += lround(appParam.period_ms * 2.048);
+//        appParam.rpm = 60000/appParam.period_ms;
+//        appParam.imu.time = 0;
+//      }
 //    }
   }
      
@@ -183,9 +242,10 @@ void sensorDataFeedIMU(uint8_t *b)
 
 void sensorDataInit(uint16_t imuRate)
 {
-  float x = 0.5,y=0.8;
+  float x = 0.95,y=0.05;
 
   m_imuSampleInterval = 1000./(float)imuRate;
+  appParam.imu.sampleIntervalMs = 1./(float)imuRate;
   appParam.imt_sample_interval = 1000./(float)imuRate;
   
     if(moduleParam.torqueRatio == 0.)
@@ -256,6 +316,6 @@ void sensorDataInit(uint16_t imuRate)
   
   imu_fusion = MahonyAHRSupdateIMU;
   
-  appParam.imu.isMax = false;
-  appParam.imu.isMin = false;
+  appParam.imu.isPos = false;
+  appParam.imu.isNeg = false;
 }
