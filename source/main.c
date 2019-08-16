@@ -149,7 +149,7 @@
 #define APP_TIMER_OP_QUEUE_SIZE     0x04 /**< Size of timer operation queues. */
 //#define CALIBRATION_DATA            0x55AAu /**< General calibration data value. */
 
-#define POLL_INTERVAL   50      // ms
+#define POLL_INTERVAL   1000      // ms
 #define POLL_TICKS      (POLL_INTERVAL*2048)/1000
 // ms to tick, measure interval of 100 ms
 #define MEASURE_INTERVAL		APP_TIMER_TICKS(POLL_INTERVAL)  /**< measurement interval (ticks). */
@@ -220,7 +220,7 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 
 #define REPORT_INTERVAL APP_TIMER_TICKS(100)
 
-APP_TIMER_DEF(m_measure_timer_id);
+APP_TIMER_DEF(m_periodic_timer_id);
 APP_TIMER_DEF(m_inertial_timer_id);
 APP_TIMER_DEF(m_report_timer_id);
 
@@ -228,42 +228,99 @@ static void advertising_start(bool erase_bonds);
 static void advertising_reconfig();
 bool m_is_ready = false;
 bool m_sysoff_started;
-//bool app_shutdown_handler(nrf_pwr_mgmt_evt_t event);
 bool app_shutdown_handler(nrf_pwr_mgmt_evt_t event)
 {
   uint32_t err_code;
 
-//  NRF_LOG_INFO("APP_SHUTDOWN Handler\n");
-//
-//  switch (event)
-//  {
-//    case NRF_PWR_MGMT_EVT_PREPARE_SYSOFF:
-//      NRF_LOG_INFO("NRF_PWR_MGMT_EVT_PREPARE_SYSOFF\n");
-////      if(sysGetState() != SYS_SLEEP){
-////        goSleep();
-////      }
-//      break;
-//
-//    case NRF_PWR_MGMT_EVT_PREPARE_WAKEUP:
-//      NRF_LOG_INFO("NRF_PWR_MGMT_EVT_PREPARE_WAKEUP\n");
-//      UNUSED_VARIABLE(err_code);
-////      if(sysGetState() == SYS_GO_WKUP){
-////        peripheral_start();
-////      }
-//      break;
-//
-//    case NRF_PWR_MGMT_EVT_PREPARE_DFU:
-//      NRF_LOG_INFO("NRF_PWR_MGMT_EVT_PREPARE_WAKEUP\n");
-//      NRF_LOG_ERROR("Entering DFU is not supported by this example.\r\n");
-//      APP_ERROR_HANDLER(NRF_ERROR_API_NOT_IMPLEMENTED);
-//      break;
-//  }
+  NRF_LOG_INFO("APP_SHUTDOWN Handler\n");
+
+  switch (event)
+  {
+    case NRF_PWR_MGMT_EVT_PREPARE_SYSOFF:
+      NRF_LOG_INFO("NRF_PWR_MGMT_EVT_PREPARE_SYSOFF\n");
+      sd_ble_gap_adv_stop();
+      //ad7124cmd_goStop();
+      ad7124cmd_goSleep();
+      bmi160_cmd_stop();      
+      bmi160_cmd_start_anymotion();
+      //app_adc_deinit(); // not help
+      break;
+
+    case NRF_PWR_MGMT_EVT_PREPARE_WAKEUP:
+      NRF_LOG_INFO("NRF_PWR_MGMT_EVT_PREPARE_WAKEUP\n");
+      UNUSED_VARIABLE(err_code);
+      sd_ble_gap_adv_stop();
+      //ad7124cmd_goStop();
+      ad7124cmd_goSleep();
+      bmi160_cmd_stop();      
+      bmi160_cmd_start_anymotion();
+      //app_adc_deinit(); // not help
+      break;
+
+    case NRF_PWR_MGMT_EVT_PREPARE_DFU:
+      NRF_LOG_INFO("NRF_PWR_MGMT_EVT_PREPARE_WAKEUP\n");
+      NRF_LOG_ERROR("Entering DFU is not supported by this example.\r\n");
+      APP_ERROR_HANDLER(NRF_ERROR_API_NOT_IMPLEMENTED);
+      break;
+  }
+  err_code = app_timer_stop_all();
+  APP_ERROR_CHECK(err_code);
 
   return true;
 }
 NRF_PWR_MGMT_HANDLER_REGISTER(app_shutdown_handler,0);
 
 /** @snippet [ANT BPWR simulator call] */
+
+static void periodic_timeout_handler(void *p_context)
+{
+  appParam.ranSeconds++;
+  appParam.rpm_idle_seconds++;
+  appParam.connection_idle_seconds++;
+
+  float r = appParam.imu.radSum*60/(appParam.imu.time)/6.28;
+  //m_rpm.f(&m_rpm.filter,r);
+  appParam.rpmHis.his[appParam.rpmHis.index++] = r;
+  if(appParam.rpmHis.index == appParam.rpmHis.nofElement)
+    appParam.rpmHis.index = 0;
+  
+  r = 0;
+  for(uint8_t i=0;i<appParam.rpmHis.nofElement;i++)
+    r += appParam.rpmHis.his[i];
+  r /= appParam.rpmHis.nofElement;
+  //appParam.rpm = m_rpm.filter.y[0]>10?m_rpm.filter.y[0]:0;
+  if(r > 10){
+    appParam.rpm = r;
+    appParam.period_ms = 60./appParam.rpm *1000;
+    appParam.period = lround(appParam.period_ms*2.048);
+    appParam.rpm_idle_seconds = 0;
+    
+    float f = 0.;
+    for(uint8_t i=0;i<appParam.tHis.nofElement;i++)
+      f += appParam.tHis.his[i];
+    f /= appParam.tHis.nofElement;
+    appParam.power = (uint16_t)lround(f*appParam.rpm*1000/9549.*2.);
+    appParam.torque[0] = (uint16_t)(lround(f*32*2));
+    
+  }else{
+    appParam.rpm = 0;
+    appParam.period = 0;
+    if(appParam.rpm_idle_seconds > moduleParam.idleTimeout){
+      // enter sleep mode
+      if(appParam.state == ST_IDLE || appParam.state == ST_ADVING){
+        nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_CONTINUE);
+//        nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
+      }
+    }
+    appParam.power = 0;
+    appParam.torque[0] = 0;
+    for(uint8_t i=0;i<appParam.tHis.nofElement;i++)
+      appParam.tHis.his[i] = 0;
+  }
+  appParam.imu.radSum = 0;
+  appParam.imu.time = 0;
+  
+}
 
 uint32_t		m_flag_measure = 0;
 static void inertial_timeout_handler(void * p_context)
@@ -279,11 +336,15 @@ void handler_report_evt(bool act,uint16_t interval)
     ad7124_cmd_config();  
     ad7124cmd_startConversion();    
     bmi160_cms_startConv();
+#ifdef APP_ANT
+      err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(250),NULL);
+#else
     if(interval >= 5){
       err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(interval),NULL);
     }
     else
       err_code = app_timer_start(m_report_timer_id,APP_TIMER_TICKS(50),NULL);
+#endif
     APP_ERROR_CHECK(err_code);
   }
   else{
@@ -454,6 +515,10 @@ static void timers_init(void)
                                 report_timeout_handler);
     APP_ERROR_CHECK(err_code);    
     
+    err_code = app_timer_create(&m_periodic_timer_id,
+                                APP_TIMER_MODE_REPEATED,
+                                periodic_timeout_handler);
+    APP_ERROR_CHECK(err_code);    
 }
 
 /**@brief Function for the GAP initialization.
@@ -579,8 +644,8 @@ static void conn_params_init(void)
 static void application_timers_start(void)
 {
   uint32_t err_code;
-//  err_code = app_timer_start(m_inertial_timer_id, MEASURE_INTERVAL, NULL);
-//  APP_ERROR_CHECK(err_code);
+  err_code = app_timer_start(m_periodic_timer_id, MEASURE_INTERVAL, NULL);
+  APP_ERROR_CHECK(err_code);
 }
 
 /**@brief Function for putting the chip into sleep mode.
@@ -619,28 +684,16 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Connected");
-            //err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
-            //APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            //set_conn_handle(m_conn_handle);
             appParam.state = ST_CONNECTED;
-//            if(p_ble_evt->evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH){
-//              NRF_LOG_INFO("Connect as peripheral");
-//              err_code = sd_ble_gap_phy_update(m_conn_handle, &phy);
-//              APP_ERROR_CHECK(err_code);
-//            }else{
-//              NRF_LOG_INFO("Connect as central");
-//            }         
             sd_ble_gap_adv_stop();
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("Disconnected");
-            //err_code = bsp_indication_set(BSP_INDICATE_IDLE);
-            //APP_ERROR_CHECK(err_code);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             set_conn_handle(m_conn_handle);
-            appParam.state = ST_DISCONNECTED;
+            appParam.state = ST_IDLE;
             advertising_start(false);
             break;
 
@@ -1033,23 +1086,6 @@ static uint32_t sd_evt_handler(void)
   return 0;
 }
 
-
-
-
-
-
-
-//==============================================================
-
-//static void fs_evt_handler(fs_evt_t const * const evt, fs_ret_t result)
-//{
-//    if (result != FS_SUCCESS)
-//    {
-//        // An error occurred.
-//    }
-//}
-
-
 static volatile uint8_t writeflag = 0;
 volatile uint8_t fdReady = 0;
 
@@ -1160,10 +1196,6 @@ void adc_drdy(void)
 void bmi_drdy(void)
 {
   //NRF_LOG_INFO(__func__);
-  if(appParam.state == ST_IDLE){
-    //NRF_LOG_INFO("Start adv");
-//    advertising_start(false);
-  }
   //todo: feed IMU data to filter and fusion
   if(appParam.opmode == 0)
     sensorDataFeedIMU(bmi_buffer);
@@ -1191,9 +1223,13 @@ int main(void)
   
   sys_param_init();
 
-  //app_adc_init();
+  appParam.rpmHis.nofElement = 8;
+  appParam.rpmHis.index = 0;
+  appParam.tHis.nofElement = 4;
+  appParam.tHis.index = 0;
+  
+  app_adc_init();
   //peer_manage_init();
-  //nrf_delay_ms(200);
   uint16_t rate = 25*(1 << (moduleParam.imu_rate_code-0x6));
   sensorDataInit(rate);
   appParam.adc_ptr = adc_buffer;
@@ -1201,23 +1237,25 @@ int main(void)
 
   bmi160_cmd_init(bmi_drdy,bmi_buffer);
   ad7124cmd_init(adc_drdy, adc_buffer);
+#ifdef APP_ANT
   ant_bpwr_init();
-  
+#endif
   NRF_LOG_INFO("Application started\n");
-//  ad7124cmd_startConversion();
-//  bmi160_cms_startConv();
+  ad7124cmd_startConversion();
+  bmi160_cms_startConv();
 
-//  bmi160_cmd_start_anymotion();
+  //bmi160_cmd_start_anymotion();
   application_timers_start();
   advertising_start(false);
   appParam.state = ST_ADVING;
-  //app_adc_start();
-  //ant_bpwr_start();
+  app_adc_start();
+#ifdef APP_ANT
+  ant_bpwr_start();
+#endif
     for (;;)
     {
       if(NRF_LOG_PROCESS() == false){
         nrf_pwr_mgmt_run();
-        //power_manage();
       }
     } 
   

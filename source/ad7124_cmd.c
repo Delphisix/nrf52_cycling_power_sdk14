@@ -204,8 +204,11 @@ int8_t ad7124cmd_goStop()
 
 int8_t ad7124cmd_goSleep()
 {
+  ad7124_stop(&ad7124);
+  
   ad7124.config->iDrv[0].iout = ADC_IOUT_OFF;
-  ad7124_setmode(AD7124_MODE_POWER_DOWN,&ad7124);
+  ad7124_setmode(AD7124_MODE_STANDBY,&ad7124);
+  return 0;
 }
 
 

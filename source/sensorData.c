@@ -5,6 +5,7 @@
 #include "mahonyAHRS.h"
 #include "sensorData.h"
 #include "sysParams.h"
+#include "nrf_pwr_mgmt.h"
 
 #define RAD2DEG 180./3.141593
 
@@ -35,18 +36,23 @@ static uint8_t pitchHisIndex = 0;
 
 void sensorDataFeedADC(uint8_t ch, uint32_t v)
 {
-  ana_ch0.filter.x[0] = ((int32_t)v - ana_ch0.offset) * ana_ch0.scale;
+  //ana_ch0.filter.x[0] = ((int32_t)v - ana_ch0.offset) * ana_ch0.scale;
   if(ana_ch0.f){
-    ana_ch0.f(&ana_ch0.filter,ana_ch0.filter.x[0]);
+    ana_ch0.f(&ana_ch0.filter,((int32_t)v - ana_ch0.offset) * ana_ch0.scale);
     if(ana_ch0.filter.y[0] > 1){
       if(appParam.t.isPositive){
         appParam.t.t_pos += ana_ch0.filter.y[0];
         appParam.t.n_pos++;
       }else{
+        float t = 0;
         if(appParam.t.n_pos >0)
-          appParam.t.t_total = appParam.t.t_pos/appParam.t.n_pos;
+          t = appParam.t.t_pos/appParam.t.n_pos;
         if(appParam.t.n_neg >0)
-          appParam.t.t_total += appParam.t.t_neg/appParam.t.n_neg;
+          t += appParam.t.t_neg/appParam.t.n_neg;
+        appParam.tHis.his[appParam.tHis.index++] = t;
+        if(appParam.tHis.index == appParam.tHis.nofElement)
+          appParam.tHis.index = 0;
+        
         appParam.t.t_pos = appParam.t.t_neg = 0;
         appParam.t.n_pos = appParam.t.n_neg = 0;
         appParam.t.t_pos = ana_ch0.filter.y[0];
@@ -66,13 +72,8 @@ void sensorDataFeedADC(uint8_t ch, uint32_t v)
         appParam.t.n_neg =1;
       }
     }
-    if(appParam.rpm > 10){
-      appParam.power = (uint16_t)lround(appParam.t.t_total*appParam.rpm*1000/9549.*2.);
-      appParam.torque[0] = (uint16_t)(lround(appParam.t.t_total*32*2));
-    }else{
-      appParam.power = 0;
-      appParam.torque[0] = 0;
-    }
+    
+//    if((appParam.t.n_pos > 60) || ())
     
   }
 }
@@ -132,124 +133,98 @@ void sensorDataFeedIMU(uint8_t *b)
     appParam.imu.time += appParam.imu.sampleIntervalMs;
     
     //if(appParam.imu.time >= 0.1){
-      //float gx = 2*(q1*q3 - q0*q2);
+      float gx = 2*(q1*q3 - q0*q2);
       //float gy = 2*(q0*q1 + q2*q3);
       //float gz = q0*q0 - q1*q1 - q2*q2 + q3*q3;
       
-      //if(gx > 1) gx = 1;
-      //if(gx < -1) gx = -1;
+      if(gx > 1) gx = 1;
+      if(gx < -1) gx = -1;
       if(newVal.ax > 1) newVal.ax = 1;
       if(newVal.ax < -1) newVal.ax = -1;
-      if(appParam.imu.count < 8){
-        appParam.imu.history[appParam.imu.count] = -asinf(newVal.ax) ;
-        appParam.imu.count++;
-        appParam.period_ms=3.1;
-      }
-      else{
-        bool pos = true;
-        bool neg = true;
-        for(int8_t i=0;i<7;i++){
-          if(appParam.imu.history[i] < 0 )
-            pos = false;
-          if(appParam.imu.history[i] > 0 )
-            neg = false;
-          appParam.imu.history[i] = appParam.imu.history[i+1];
-        }
-        
-        if(appParam.imu.isPos){
-          if(!pos){
-            appParam.period_ms = appParam.imu.time;
-            appParam.imu.time = 0;      
-          }
-        }
-        appParam.imu.isPos = pos;
-        appParam.imu.history[7] = -asin(newVal.ax);
-        
-        if((appParam.imu.time - appParam.period_ms) > 0.1){
-          appParam.period_ms = appParam.imu.time;
-        
-        if(appParam.period_ms > 3){
-          appParam.period = 0;
-          appParam.rpm = 0;
-        }
-        else if(appParam.period_ms < 0.25){
-          appParam.period = 0;
-          appParam.rpm = 0;
-        }
-        else{
-          appParam.period += lround(appParam.period_ms * 1024);
-          appParam.rpm = 60/appParam.period_ms/2;
-          appParam.imu.time = 0;
-        }
-        }
-      }
-    //}
-    
-//    float bb = 0;
-//    bool max_found = false;
-//    
-//    if(imu_ax.filter.y[0] > 0.1){
-//      if(appParam.imu.isMax){
-//        if(imu_ax.filter.y[0] > appParam.imu.val){
-//          appParam.imu.val = imu_ax.filter.y[0];
-//        }else{ // max found
-//          appParam.imu.isMax = false;
-//          appParam.imu.isMin = true;
-//          max_found = true;
-//        }
-//      }else{
-//        appParam.imu.isMax = true; // set to find max
-//        appParam.imu.val = imu_ax.filter.y[0];
-//      }
-//    }
-//    else if(imu_ax.filter.y[0] < 0.1){
-//      if(appParam.imu.isMin){
-//        if(imu_ax.filter.y[0] < appParam.imu.val){
-//          appParam.imu.val = imu_ax.filter.y[0];          
+      float rad = -asinf(newVal.ax);
+      float dr = rad - appParam.imu.prevRad;
+      int32_t *dp = (int32_t*)&dr;
+      (*dp) &= 0x7fffffff;
+      appParam.imu.prevRad = rad;
+      appParam.imu.radSum += dr;
+      
+//      if(appParam.imu.time >= 0.5){
+//        float r = appParam.imu.radSum*60/(appParam.imu.time)/6.28;
+//        m_rpm.f(&m_rpm.filter,r);
+//        appParam.rpm = m_rpm.filter.y[0]>10?m_rpm.filter.y[0]:0;
+//        if(appParam.rpm > 10){
+//          appParam.period_ms = 60./appParam.rpm *1000;
+//          appParam.period = lround(appParam.period_ms*2.048);
+//          appParam.rpm_idle_seconds = 0;
 //        }else{
-//          appParam.imu.isMax = true;
-//          appParam.imu.isMin = false;
+//          appParam.period = 0;
+//          if(appParam.rpm_idle_seconds > moduleParam.idleTimeout){
+//            // enter sleep mode
+//            if(appParam.state == ST_IDLE || appParam.state == ST_ADVING)
+//              nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_STAY_IN_SYSOFF);
+//          }
 //        }
-//      }else{
-//        appParam.imu.isMin = true;
-//        appParam.imu.val = imu_ax.filter.y[0];          
-//      }
-//    }
-//    
-//    if(max_found){
-//      if(appParam.imu.time > 240){
-//        appParam.period_ms = appParam.imu.time;
-//        appParam.period = lround(appParam.period_ms * 2.048);
-//        appParam.rpm = 60000/appParam.period_ms;
+//        appParam.imu.radSum = 0;
 //        appParam.imu.time = 0;
 //      }
-//    }
-//    else if((appParam.imu.time - appParam.period_ms) > 100){
-//      appParam.period_ms = appParam.imu.time;
-//      if(appParam.period_ms > 3000){
-//        appParam.period = 0;
-//        appParam.rpm = 0;
+      
+//      if(appParam.imu.count < 8){
+////        appParam.imu.history[appParam.imu.count] = -asinf(newVal.ax) ;
+//        appParam.imu.history[appParam.imu.count] = -asinf(gx) ;
+//        appParam.imu.count++;
+//        //appParam.period_ms=3.1;
 //      }
 //      else{
-//        appParam.period += lround(appParam.period_ms * 2.048);
-//        appParam.rpm = 60000/appParam.period_ms;
-//        appParam.imu.time = 0;
+//        bool pos = true;
+//        bool neg = true;
+//        float da,sum_da = 0;
+//        int32_t *dp = (int32_t*)&da;
+//        uint8_t cnts = 0;
+//        for(int8_t i=0;i<7;i++){
+//          da = appParam.imu.history[i+1] - appParam.imu.history[i];
+//          (*dp) &= 0x7fffffff;
+//          if(da < 1){
+//            sum_da += da;
+//            cnts++;
+//          }
+//          appParam.imu.history[i] = appParam.imu.history[i+1];
+//        }
+//        appParam.imu.history[7] = -asin(newVal.ax);
+//        
+//        if(cnts){
+//          float r = sum_da*60/(appParam.imu.sampleIntervalMs*cnts)/6.28;
+//          m_rpm.f(&m_rpm.filter,r);
+//          appParam.rpm = m_rpm.filter.y[0]>10?m_rpm.filter.y[0]:0;
+//          if(appParam.rpm > 10){
+//            appParam.period_ms = 60./appParam.rpm *1000;
+//            appParam.period = lround(appParam.period_ms*2.048);
+//            appParam.rpm_idle_seconds = 0;
+//          }else{
+//            appParam.period = 0;
+////            appParam.rpm_zero_count++;
+//            if(appParam.rpm_idle_seconds > moduleParam.idleTimeout){
+//              // enter sleep mode
+//              if(appParam.state == ST_IDLE || appParam.state == ST_ADVING)
+//                nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_STAY_IN_SYSOFF);
+//            }
+//          }
+//        }
+//        appParam.imu.count = 0;
 //      }
-//    }
   }
      
 }
 
 void sensorDataInit(uint16_t imuRate)
 {
-  float x = 0.95,y=0.05;
+  float x = 0.2,y=0.05;
 
   m_imuSampleInterval = 1000./(float)imuRate;
   appParam.imu.sampleIntervalMs = 1./(float)imuRate;
   appParam.imt_sample_interval = 1000./(float)imuRate;
   
-    if(moduleParam.torqueRatio == 0.)
-    moduleParam.torqueRatio = 58;
+    if(moduleParam.torqueRatio[0] == 0.)
+    moduleParam.torqueRatio[0] = 58;
 
   appParam.t.t_pos = 0.;
   appParam.t.t_neg = 0.;
@@ -268,7 +243,7 @@ void sensorDataInit(uint16_t imuRate)
   ana_ch0.offset <<=8;
   ana_ch0.offset +=0x800000;
   ana_ch0.scale = 1./8388608./128.*1000;
-  ana_ch0.scale *= -moduleParam.torqueRatio; // convert to N-m
+  ana_ch0.scale *= -moduleParam.torqueRatio[0]; // convert to N-m
   ana_ch0.filter.a[0] = x;
   ana_ch0.filter.b[0] = 1-x;
   
@@ -318,4 +293,6 @@ void sensorDataInit(uint16_t imuRate)
   
   appParam.imu.isPos = false;
   appParam.imu.isNeg = false;
+  
+  appParam.rpm_zero_count = 0;
 }

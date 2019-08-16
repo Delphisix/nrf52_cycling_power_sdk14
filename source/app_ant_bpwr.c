@@ -77,7 +77,7 @@ void ant_bpwr_evt_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_evt_t event)
   {
     case ANT_BPWR_PAGE_1_UPDATED:
       m_ant_bpwr.page_1.data.general_calib = ANT_BPWR_CALIB_ID_AUTO_SUPPORT;
-      m_ant_bpwr.page_1.auto_zero_status = ANT_BPWR_AUTO_ZERO_NOT_SUPPORTED;
+      m_ant_bpwr.page_1.auto_zero_status = ANT_BPWR_AUTO_ZERO_OFF;
       break;
             /* fall through */
     case ANT_BPWR_PAGE_16_UPDATED:
@@ -110,6 +110,9 @@ void ant_bpwr_evt_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_evt_t event)
     case ANT_BPWR_PAGE_81_UPDATED:
      
       break;
+  case ANT_BPWR_PAGE_82_UPDATED:
+    m_ant_bpwr.page_82.battery_indicator++;
+    break;
 //    default:
 //      ant_bpwr_simulator_one_iteration(&m_ant_bpwr_simulator, event);
   }
@@ -224,17 +227,23 @@ static void profile_setup(void)
     APP_ERROR_CHECK(err_code);
 
     // fill manufacturer's common data page.
-    m_ant_bpwr.page_80 = ANT_COMMON_page80(BPWR_HW_REVISION,
-                                           BPWR_MANUFACTURER_ID,
-                                           BPWR_MODEL_NUMBER);
+    m_ant_bpwr.page_80 = ANT_COMMON_page80(moduleParam.hw_revision,
+                                           moduleParam.manufacturer_id,
+                                           moduleParam.model_number);
+//    m_ant_bpwr.page_80 = ANT_COMMON_page80(BPWR_HW_REVISION,
+//                                           BPWR_MANUFACTURER_ID,
+//                                           BPWR_MODEL_NUMBER);
     // fill product's common data page.
-    m_ant_bpwr.page_81 = ANT_COMMON_page81(BPWR_SW_REVISION_MAJOR,
-                                           BPWR_SW_REVISION_MINOR,
-                                           BPWR_SERIAL_NUMBER);
+    m_ant_bpwr.page_81 = ANT_COMMON_page81(moduleParam.sw_revision_minor,
+                                           moduleParam.sw_revision_major,
+                                           moduleParam.serial_number);
+//    m_ant_bpwr.page_81 = ANT_COMMON_page81(BPWR_SW_REVISION_MAJOR,
+//                                           BPWR_SW_REVISION_MINOR,
+//                                           BPWR_SERIAL_NUMBER);
 
     m_ant_bpwr.BPWR_PROFILE_auto_zero_status = ANT_BPWR_AUTO_ZERO_OFF;
 
-
+    m_ant_bpwr.page_82 = ANT_COMMON_page82(0x11,0x00,0x00,0x00,0x00,0x13);
 
 /** @snippet [ANT BPWR TX Profile Setup] */
 }

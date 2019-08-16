@@ -245,7 +245,7 @@
 // <e> ANT_BPWR_PAGE_1_LOG_ENABLED - Enables logging of BPWR page 1 in the module.
 //==========================================================
 #ifndef ANT_BPWR_PAGE_1_LOG_ENABLED
-#define ANT_BPWR_PAGE_1_LOG_ENABLED 1
+#define ANT_BPWR_PAGE_1_LOG_ENABLED 0
 #endif
 // <o> ANT_BPWR_PAGE_1_LOG_LEVEL  - Default Severity level
  
@@ -315,7 +315,7 @@
 // <e> ANT_BPWR_PAGE_17_LOG_ENABLED - Enables logging of BPWR page 17 in the module.
 //==========================================================
 #ifndef ANT_BPWR_PAGE_17_LOG_ENABLED
-#define ANT_BPWR_PAGE_17_LOG_ENABLED 1
+#define ANT_BPWR_PAGE_17_LOG_ENABLED 0
 #endif
 // <o> ANT_BPWR_PAGE_17_LOG_LEVEL  - Default Severity level
  
@@ -399,7 +399,7 @@
 // <e> ANT_COMMON_PAGE_80_LOG_ENABLED - Enables logging of common page 80 in the module.
 //==========================================================
 #ifndef ANT_COMMON_PAGE_80_LOG_ENABLED
-#define ANT_COMMON_PAGE_80_LOG_ENABLED 1
+#define ANT_COMMON_PAGE_80_LOG_ENABLED 0
 #endif
 // <o> ANT_COMMON_PAGE_80_LOG_LEVEL  - Default Severity level
  
@@ -441,7 +441,7 @@
 // <e> ANT_COMMON_PAGE_81_LOG_ENABLED - Enables logging of common page 81 in the module.
 //==========================================================
 #ifndef ANT_COMMON_PAGE_81_LOG_ENABLED
-#define ANT_COMMON_PAGE_81_LOG_ENABLED 1
+#define ANT_COMMON_PAGE_81_LOG_ENABLED 0
 #endif
 // <o> ANT_COMMON_PAGE_81_LOG_LEVEL  - Default Severity level
  
@@ -470,6 +470,11 @@
 #ifndef ANT_COMMON_PAGE_81_INFO_COLOR
 #define ANT_COMMON_PAGE_81_INFO_COLOR 0
 #endif
+
+#ifndef ANT_COMMON_PAGE_82_ENABLED
+#define ANT_COMMON_PAGE_82_ENABLED 1
+#endif
+
 
 // </e>
 

@@ -205,8 +205,9 @@
           <state>BLE_STACK_SUPPORT_REQD</state>
           <state>CONFIG_NFCT_PINS_AS_GPIOS</state>
           <state>NRF_SD_BLE_API_VERSION=5</state>
-          <state>APP_NEED_ANT_BPWR</state>
           <state>APP_NEED_BLE_NUS</state>
+          <state>APP_NEED_ANT_BPWR</state>
+          <state>APP_ANT</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -2354,6 +2355,9 @@
         </file>
         <file>
           <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ant\ant_profiles\ant_common\pages\ant_common_page_81.c</name>
+        </file>
+        <file>
+          <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ant\ant_profiles\ant_common\pages\ant_common_page_82.c</name>
         </file>
         <file>
           <name>$extsource$\NRF\nRF5_SDK_14.0.0_3bcc1f7\components\ant\ant_profiles\ant_common\ant_request_controller\ant_request_controller.c</name>

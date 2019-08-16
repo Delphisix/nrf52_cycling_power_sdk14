@@ -218,6 +218,7 @@ void handlePacket(uint8_t *b, uint8_t target)
   cmd_header_t *header = (cmd_header_t*)b;
   if(target == CMD_DEVICE){
       NRF_LOG_INFO("Device Command");
+      appParam.connection_idle_seconds = 0;
       uint8_t cmd = header->pid & (~NOCRC_MASK);
       uint16_t arg;
       appParam.opmode = cmd;
@@ -246,6 +247,15 @@ void handlePacket(uint8_t *b, uint8_t target)
               appParam.pid = 0;
             }
             report_cmd_ok(header);
+            break;
+          case CMD_PID_CONTROL_DEV_READ_BAT:
+            {
+              uint8_t b[10];
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&appParam.bat_volt,4);
+              uint16_t len = buildPacket(type,header->pid,NULL,4,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
             break;
           default:
             report_cmd_ng(header);
@@ -303,6 +313,68 @@ void handlePacket(uint8_t *b, uint8_t target)
               moduleParam.imu_acc_range = b[8];
               moduleParam.imu_gyro_range = b[9];
               moduleParam.imu_rate_code = b[10];
+              report_cmd_ok(header);
+            }
+            break;
+          case CMD_PID_SETUP_ADC_RATIO:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&moduleParam.torqueRatio[0],4);
+              memcpy(&b[12],(void*)&moduleParam.torqueRatio[1],4);
+              uint16_t len = buildPacket(type,header->pid,NULL,8,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)&moduleParam.torqueRatio[0],&b[8],4);
+              memcpy((void*)&moduleParam.torqueRatio[0],&b[12],4);
+              report_cmd_ok(header);
+            }
+            break;
+          case CMD_PID_SETUP_BAT_RATIO:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&moduleParam.vbatRatio,4);
+              uint16_t len = buildPacket(type,header->pid,NULL,4,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)&moduleParam.vbatRatio,&b[8],4);
+              report_cmd_ok(header);
+            }
+            break;
+          case CMD_PID_SETUP_ADC_OFFSET:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&moduleParam.adcOffset,4);
+              uint16_t len = buildPacket(type,header->pid,NULL,4,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)&moduleParam.adcOffset,&b[8],4);
+              report_cmd_ok(header);
+            }
+            break;
+          case CMD_PID_SETUP_APP_NAME:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)moduleParam.appName,16);
+              uint16_t len = buildPacket(type,header->pid,NULL,16,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)moduleParam.appName,&b[8],header->len-8);
+              report_cmd_ok(header);
+            }
+            break;
+          case CMD_PID_SETUP_IDLE_TIMEOUT:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&moduleParam.idleTimeout,2);
+              uint16_t len = buildPacket(type,header->pid,NULL,2,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)&moduleParam.idleTimeout,&b[8],2);
               report_cmd_ok(header);
             }
             break;

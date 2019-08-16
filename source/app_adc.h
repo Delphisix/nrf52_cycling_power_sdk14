@@ -3,5 +3,5 @@
 
 void app_adc_init(void);
 void app_adc_start();
-
+void app_adc_deinit();
 #endif

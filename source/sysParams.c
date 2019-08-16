@@ -152,14 +152,25 @@ ret_code_t sysparam_load(void)
   else if(err_code == FDS_ERR_NOT_FOUND){
     NRF_LOG_INFO("Create sysparam record");
     moduleParam.flag = 0xAA;
-    moduleParam.adc_filter_code = 59;
+    moduleParam.adc_filter_code = 40;
     moduleParam.adc_gain_code = 0x7;
     moduleParam.imu_acc_range = 0x0;
     moduleParam.imu_gyro_range = 0x0;
-    moduleParam.imu_rate_code = 0x8;
+    moduleParam.imu_rate_code = 0x7;
     moduleParam.senseoMask = 0xffffffff;
     moduleParam.scan_interval = 50;
+    moduleParam.torqueRatio[0] = moduleParam.torqueRatio[1] = 58.0;
+    moduleParam.vbatRatio = 27.5;
+    moduleParam.idleTimeout = 120; // seconds
+    moduleParam.connectionTimeout = 120;
     memcpy(moduleParam.appName,"Grididea BP01\0",14);
+    
+    moduleParam.hw_revision = 0x21;
+    moduleParam.manufacturer_id = 0x53290921;
+    moduleParam.model_number = 17003;
+    moduleParam.sw_revision_minor = 0;
+    moduleParam.sw_revision_major = 2;
+    moduleParam.serial_number = 0x1;
     err_code = file_create((uint8_t*)&moduleParam,sizeof(moduleParam));
   }
   return err_code;

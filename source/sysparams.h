@@ -14,10 +14,18 @@ typedef struct{
   uint8_t imu_acc_range;
   uint8_t imu_gyro_range;
   float vbatRatio;
-  float torqueRatio;
+  float torqueRatio[2];
   int16_t adcOffset[2];
-  uint8_t dummy[3];
   uint8_t appName[16];
+  uint16_t idleTimeout;
+  uint16_t connectionTimeout;
+  uint8_t dummy[3];
+  uint8_t hw_revision;
+  uint16_t manufacturer_id;
+  uint16_t model_number;
+  uint8_t sw_revision_minor;
+  uint8_t sw_revision_major;
+  uint32_t serial_number;
 }module_param_t;
 
 typedef enum{
@@ -55,8 +63,15 @@ typedef struct{
   float history[8];
   uint8_t count;
   float sampleIntervalMs;
+  float prevRad;
+  float radSum;
 }_accum_imu_t;
 
+typedef struct{
+  uint8_t index;
+  uint8_t nofElement;
+  float his[8];
+}_his_data_t;
 
 
 typedef struct{
@@ -89,6 +104,12 @@ typedef struct{
   uint8_t pid;
   _accum_imu_t imu;
   uint8_t opmode;
+  uint32_t rpm_zero_count;
+  uint32_t ranSeconds;
+  uint32_t rpm_idle_seconds;
+  uint32_t connection_idle_seconds;
+  _his_data_t rpmHis;
+  _his_data_t tHis;
 }app_param_t;
   
 extern module_param_t moduleParam;

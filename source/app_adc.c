@@ -130,3 +130,16 @@ void app_adc_start()
 {
   saadc_sampling_event_enable();
 }
+
+void app_adc_deinit()
+{
+    ret_code_t err_code = nrf_drv_ppi_channel_disable(m_ppi_channel);
+    APP_ERROR_CHECK(err_code);
+
+//    err_code = nrf_drv_saadc_channel_uninit(0);
+//    APP_ERROR_CHECK(err_code);
+  
+    nrf_drv_saadc_uninit();
+
+
+}

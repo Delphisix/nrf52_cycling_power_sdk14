@@ -148,7 +148,7 @@ void bmi160_cmd_config_int_am(struct bmi160_dev *dev,uint8_t st)
     int_config.int_type_cfg.acc_any_motion_int.anymotion_y = BMI160_ENABLE;
     int_config.int_type_cfg.acc_any_motion_int.anymotion_z = BMI160_ENABLE;
     int_config.int_type_cfg.acc_any_motion_int.anymotion_dur = 0;
-    int_config.int_type_cfg.acc_any_motion_int.anymotion_thr = 200;
+    int_config.int_type_cfg.acc_any_motion_int.anymotion_thr = 20;
   }
   else{
     int_config.int_channel = BMI160_INT_CHANNEL_NONE;
@@ -320,13 +320,20 @@ void bmi160_delay(uint32_t period)
 
 void bmi160_int_isr(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {
+  union bmi160_int_status interrupt;
+  int8_t rslt;
+  rslt = bmi160_get_int_status(BMI160_INT_STATUS_ALL,&interrupt,&bmi160);
+  if(interrupt.bit.anym){
+    NRF_LOG_INFO("Any Motion interrupt");
+  }
+  
   if(f_buf){
-    NRF_LOG_INFO("%s with Buffer=%d",__func__,f_buf);
+    //NRF_LOG_INFO("%s with Buffer=%d",__func__,f_buf);
     bmi160_get_regs(BMI160_GYRO_DATA_ADDR, f_buf, 12, &bmi160);
-    bool az = true;
-    for(uint8_t i=0;i<12;i++)
-      if(f_buf[i] != 0x0) az = false;
-    if(az) NRF_LOG_INFO("%s, BUFFER ZERO",__func__);
+//    bool az = true;
+//    for(uint8_t i=0;i<12;i++)
+//      if(f_buf[i] != 0x0) az = false;
+//    if(az) NRF_LOG_INFO("%s, BUFFER ZERO",__func__);
     if(f_cb) f_cb();
   }else{
     NRF_LOG_INFO("%s No Buffer=%d",__func__,f_buf);
@@ -351,14 +358,22 @@ void bmi160_cmd_start(bool intEn)
 
 int8_t bmi160_cms_startConv(void)
 {
-//  if(!f) return -1;
-//  if(!buf) return -1; 
-//   f_cb = f;
-//  f_buf = buf;
   bmi160_cmd_config_int_am(&bmi160,0);
   bmi160_cmd_config_int(&bmi160,1);
   //nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
-  bmi160_cmd_pwup(&bmi160);
+  
+  bmi160.accel_cfg.power = BMI160_ACCEL_NORMAL_MODE;
+  bmi160.accel_cfg.odr = moduleParam.imu_rate_code;
+  bmi160.accel_cfg.range = moduleParam.imu_acc_range;
+  bmi160.accel_cfg.bw = BMI160_ACCEL_BW_OSR4_AVG1;
+  bmi160.gyro_cfg.power = BMI160_GYRO_NORMAL_MODE;
+  bmi160.gyro_cfg.odr = moduleParam.imu_rate_code;
+  bmi160.gyro_cfg.range = moduleParam.imu_gyro_range;
+  bmi160.gyro_cfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
+  
+  bmi160_update_sensor_config(&bmi160);
+  
+  //bmi160_cmd_pwup(&bmi160);
   
   NRF_LOG_INFO("BMI160:odr=%d",bmi160.accel_cfg.odr);
 
@@ -368,9 +383,21 @@ int8_t bmi160_cms_startConv(void)
 
 int8_t bmi160_cmd_start_anymotion(void)
 {
-  bmi160_cmd_pwup(&bmi160);
   bmi160_cmd_config_int(&bmi160,0); 
   bmi160_cmd_config_int_am(&bmi160,1);
+  bmi160.accel_cfg.power = BMI160_ACCEL_LOWPOWER_MODE;
+//  bmi160.accel_cfg.power = BMI160_ACCEL_NORMAL_MODE;
+  bmi160.accel_cfg.odr = BMI160_ACCEL_ODR_0_78HZ;
+  bmi160.accel_cfg.range = BMI160_ACCEL_RANGE_2G;
+  bmi160.accel_cfg.bw = BMI160_ACCEL_BW_OSR4_AVG1;
+  bmi160.gyro_cfg.power = BMI160_GYRO_SUSPEND_MODE;
+//  bmi160.gyro_cfg.power = BMI160_GYRO_NORMAL_MODE;
+  bmi160.gyro_cfg.odr = BMI160_GYRO_ODR_25HZ;
+  bmi160.gyro_cfg.range = BMI160_GYRO_RANGE_2000_DPS;
+  bmi160.gyro_cfg.bw = BMI160_GYRO_BW_NORMAL_MODE;
+  
+  bmi160_update_sensor_config(&bmi160);
+//  bmi160_cmd_pwup(&bmi160);
   //bmi160_cmd_pwdn(&bmi160);
   //nrf_drv_gpiote_in_event_enable(BMI160_INT1_PIN,true);
 }
