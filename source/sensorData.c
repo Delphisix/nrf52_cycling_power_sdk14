@@ -24,7 +24,7 @@ ANALOG_LPF_DEF(m_rpm);
 
 IMU_DATA_DEF(imu);
 VIBRATION_DEF(accel,1000);
-ANALOG_LPF_DEF(m_pitch);
+//ANALOG_LPF_DEF(m_pitch);
 static float m_pitchDeg,m_pitchDegPrev;;
 static float m_imuSampleInterval;       // in second
 static float accumulated_pitch_angle;
@@ -45,10 +45,14 @@ void sensorDataFeedADC(uint8_t ch, uint32_t v)
         appParam.t.n_pos++;
       }else{
         float t = 0;
-        if(appParam.t.n_pos >0)
-          t = appParam.t.t_pos/appParam.t.n_pos;
-        if(appParam.t.n_neg >0)
-          t += appParam.t.t_neg/appParam.t.n_neg;
+        uint16_t n = appParam.t.n_pos + appParam.t.n_neg;
+        if(n){
+          t = (appParam.t.t_pos + appParam.t.t_neg)/n;
+        }
+//        if(appParam.t.n_pos >0)
+//          t = appParam.t.t_pos/appParam.t.n_pos;
+//        if(appParam.t.n_neg >0)
+//          t += appParam.t.t_neg/appParam.t.n_neg;
         appParam.tHis.his[appParam.tHis.index++] = t;
         if(appParam.tHis.index == appParam.tHis.nofElement)
           appParam.tHis.index = 0;
@@ -243,14 +247,14 @@ void sensorDataInit(uint16_t imuRate)
   ana_ch0.offset <<=8;
   ana_ch0.offset +=0x800000;
   ana_ch0.scale = 1./8388608./128.*1000;
-  ana_ch0.scale *= -moduleParam.torqueRatio[0]; // convert to N-m
+  ana_ch0.scale *= moduleParam.torqueRatio[0]; // convert to N-m
   ana_ch0.filter.a[0] = x;
   ana_ch0.filter.b[0] = 1-x;
   
-  m_pitch.offset = 0;
-  m_pitch.scale = 180./3.14159; // convert to degree
-  m_pitch.filter.a[0] = x;
-  m_pitch.filter.b[0] = 1-x;
+//  m_pitch.offset = 0;
+//  m_pitch.scale = 180./3.14159; // convert to degree
+//  m_pitch.filter.a[0] = x;
+//  m_pitch.filter.b[0] = 1-x;
   
   
   

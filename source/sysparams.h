@@ -14,6 +14,8 @@ typedef struct{
   uint8_t imu_acc_range;
   uint8_t imu_gyro_range;
   float vbatRatio;
+  float lbtThreshold;
+  uint16_t lbtKeepSecs;
   float torqueRatio[2];
   int16_t adcOffset[2];
   uint8_t appName[16];
@@ -110,6 +112,8 @@ typedef struct{
   uint32_t connection_idle_seconds;
   _his_data_t rpmHis;
   _his_data_t tHis;
+  uint8_t lbtCount;
+  uint16_t sampleToIgnore;
 }app_param_t;
   
 extern module_param_t moduleParam;

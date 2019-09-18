@@ -155,16 +155,8 @@
 #define MEASURE_INTERVAL		APP_TIMER_TICKS(POLL_INTERVAL)  /**< measurement interval (ticks). */
 #define REPORT_INTERVAL APP_TIMER_TICKS(100)
 
-
-bool appTimerStopped =false;
-
-#pragma location = 0x6F000    // last page before bootloader
-//__root storedParam_t storedParam;
 sysParam_t sysParam;
       
-/** @snippet [ANT BPWR TX Instance] */
-//void ant_bpwr_evt_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_evt_t event);
-//void ant_bpwr_calib_handler(ant_bpwr_profile_t * p_profile, ant_bpwr_page1_data_t * p_page1);
 
 static uint8_t testRPM = 0;
 static uint8_t testTorque = 0;
@@ -223,6 +215,7 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 APP_TIMER_DEF(m_periodic_timer_id);
 APP_TIMER_DEF(m_inertial_timer_id);
 APP_TIMER_DEF(m_report_timer_id);
+APP_TIMER_DEF(m_flash_timer_id);
 
 static void advertising_start(bool erase_bonds); 
 static void advertising_reconfig();
@@ -272,6 +265,10 @@ NRF_PWR_MGMT_HANDLER_REGISTER(app_shutdown_handler,0);
 
 /** @snippet [ANT BPWR simulator call] */
 
+static void flash_timeout_handler(void *p_context)
+{
+  bsp_board_led_off(0);
+}  
 static void periodic_timeout_handler(void *p_context)
 {
   appParam.ranSeconds++;
@@ -319,6 +316,19 @@ static void periodic_timeout_handler(void *p_context)
   }
   appParam.imu.radSum = 0;
   appParam.imu.time = 0;
+  
+  // battery check
+  if(appParam.bat_volt < moduleParam.lbtThreshold){
+    appParam.lbtCount++;
+    if(appParam.lbtCount > moduleParam.lbtKeepSecs){
+      appParam.lbtCount--;
+      bsp_board_led_on(0);
+      app_timer_start(m_flash_timer_id,APP_TIMER_TICKS(50),NULL);
+    }
+  }
+  else{
+    appParam.lbtCount = 0;
+  }
   
 }
 
@@ -376,38 +386,38 @@ void report_timeout_handler(void *p_context)
 //  memcpy(&buf[8],&appParam.torque_nm[0],4);
 //  app_ble_nus_feed_data(buf,12);
 //}
-static void measure_timeout_handler(void * p_context)
-{
-  UNUSED_PARAMETER(p_context);
-  uint8_t u8;
-  m_flag_measure = 1;
-  sysstate_t state = sysGetState();
-  switch(state){
-  case SYS_IDLE:
-  case SYS_NORMAL:
-    break;
-  case SYS_GO_SLEEP:
-    goSleep();
-    NRF_LOG_INFO("Go Sleep\r\n");
-    break;
-  case SYS_SLEEP:
-    // shut down system, wakeup by gpiote
-    
-    if(!appTimerStopped){
-      app_timer_stop_all();
-      appTimerStopped = true;
-    }
-    break;
-  case SYS_GO_WKUP:
-    NRF_LOG_INFO("Go Wakeup\r\n");
-    peripheral_start();
-
-    break;
-    
-  }
-  NRF_LOG_FLUSH();
-
-}
+//static void measure_timeout_handler(void * p_context)
+//{
+//  UNUSED_PARAMETER(p_context);
+//  uint8_t u8;
+//  m_flag_measure = 1;
+//  sysstate_t state = sysGetState();
+//  switch(state){
+//  case SYS_IDLE:
+//  case SYS_NORMAL:
+//    break;
+//  case SYS_GO_SLEEP:
+//    goSleep();
+//    NRF_LOG_INFO("Go Sleep\r\n");
+//    break;
+//  case SYS_SLEEP:
+//    // shut down system, wakeup by gpiote
+//    
+//    if(!appTimerStopped){
+//      app_timer_stop_all();
+//      appTimerStopped = true;
+//    }
+//    break;
+//  case SYS_GO_WKUP:
+//    NRF_LOG_INFO("Go Wakeup\r\n");
+//    peripheral_start();
+//
+//    break;
+//    
+//  }
+//  NRF_LOG_FLUSH();
+//
+//}
 
 /**@brief Function for handling advertising events.
  *
@@ -518,6 +528,11 @@ static void timers_init(void)
     err_code = app_timer_create(&m_periodic_timer_id,
                                 APP_TIMER_MODE_REPEATED,
                                 periodic_timeout_handler);
+    APP_ERROR_CHECK(err_code);    
+
+    err_code = app_timer_create(&m_flash_timer_id,
+                                APP_TIMER_MODE_SINGLE_SHOT,
+                                flash_timeout_handler);
     APP_ERROR_CHECK(err_code);    
 }
 
@@ -1189,7 +1204,7 @@ uint16_t adc_cntr = 0;
 void adc_drdy(void)
 {
   adc_cntr++;
-  if(appParam.opmode == 0)
+  if(appParam.opmode == 0 && appParam.sampleToIgnore == 0)
     sensorDataFeedADC(0,adc_buffer[0]>>8);
 }
 
@@ -1197,7 +1212,9 @@ void bmi_drdy(void)
 {
   //NRF_LOG_INFO(__func__);
   //todo: feed IMU data to filter and fusion
-  if(appParam.opmode == 0)
+  if(appParam.sampleToIgnore)
+    appParam.sampleToIgnore--;
+  if(appParam.opmode == 0 && appParam.sampleToIgnore == 0)
     sensorDataFeedIMU(bmi_buffer);
 }
 
@@ -1235,6 +1252,7 @@ int main(void)
   appParam.adc_ptr = adc_buffer;
   appParam.bmi_ptr = bmi_buffer;
 
+  appParam.sampleToIgnore = 50;
   bmi160_cmd_init(bmi_drdy,bmi_buffer);
   ad7124cmd_init(adc_drdy, adc_buffer);
 #ifdef APP_ANT

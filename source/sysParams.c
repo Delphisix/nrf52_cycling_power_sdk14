@@ -161,6 +161,8 @@ ret_code_t sysparam_load(void)
     moduleParam.scan_interval = 50;
     moduleParam.torqueRatio[0] = moduleParam.torqueRatio[1] = 58.0;
     moduleParam.vbatRatio = 27.5;
+    moduleParam.lbtThreshold = 3650;
+    moduleParam.lbtKeepSecs = 30;
     moduleParam.idleTimeout = 120; // seconds
     moduleParam.connectionTimeout = 120;
     memcpy(moduleParam.appName,"Grididea BP01\0",14);

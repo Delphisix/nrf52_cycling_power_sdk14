@@ -378,6 +378,30 @@ void handlePacket(uint8_t *b, uint8_t target)
               report_cmd_ok(header);
             }
             break;
+          case CMD_PID_SETUP_LBT_THRESHOLD:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&moduleParam.lbtThreshold,4);
+              uint16_t len = buildPacket(type,header->pid,NULL,4,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)&moduleParam.lbtThreshold,&b[8],4);
+              report_cmd_ok(header);
+            }
+            break;
+          case CMD_PID_SETUP_LBT_DELAY:
+            if(header->len == 8){
+              uint8_t type = (header->type & 0xf) | MASK_TYPE_RET_CFG;
+              memcpy(&b[8],(void*)&moduleParam.lbtKeepSecs,2);
+              uint16_t len = buildPacket(type,header->pid,NULL,2,b);
+              ble_nus_string_send(&m_nus,b,&len);
+            }
+            else{
+              memcpy((void*)&moduleParam.lbtKeepSecs,&b[8],2);
+              report_cmd_ok(header);
+            }
+            break;
           case CMD_PID_SETUP_SYSTEM:
             if(header->len == 9){
               if(b[8] == 0x02){
